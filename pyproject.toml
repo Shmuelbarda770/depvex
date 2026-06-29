@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = "depix"
+name = "depvex"
 dynamic = ["version"]
 description = "Dependency and environment checker tool"
 readme = "README.md"
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-depix = "depix.cli:main"
+depvex = "depvex.cli:main"
 
 
 [tool.setuptools_scm]

@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="depix",
+    name="depvex",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
@@ -9,7 +9,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "depix=depix.cli:main",
+            "depvex=depvex.cli:main",
         ],
     },
 )  

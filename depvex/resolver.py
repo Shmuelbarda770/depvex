@@ -6,7 +6,7 @@ import os
 import requests
 import time
 
-from depix.parser import extract_imports
+from depvex.parser import extract_imports
 
 
 CAPTIVE_PORTAL_URLS = [
@@ -145,7 +145,7 @@ def monitor_project(module_list, interval=2):
                 req.append(resolve(m, has_net))
 
         if req != last_req:
-            print("\n[depix] REQUIREMENTS UPDATED")
+            print("\n[depvex] REQUIREMENTS UPDATED")
             for r in req:
                 print(" ", r)
 

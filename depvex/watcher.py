@@ -2,8 +2,8 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from depix.parser import extract_imports
-from depix.resolver import rebuild_requirements
+from depvex.parser import extract_imports
+from depvex.resolver import rebuild_requirements
 
 
 class Handler(FileSystemEventHandler):
@@ -15,12 +15,12 @@ class Handler(FileSystemEventHandler):
             return
 
         if event.src_path.endswith(".py"):
-            print(f"[depix] change detected → full rescan")
+            print(f"[depvex] change detected → full rescan")
             rebuild_requirements(self.root)
 
 
 def start_watching(path):
-    print("[depix] watching:", path)
+    print("[depvex] watching:", path)
 
     event_handler = Handler(path)
     observer = Observer()
