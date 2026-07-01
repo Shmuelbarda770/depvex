@@ -23,6 +23,11 @@ dependencies = [
   "watchdog==6.0.0"
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0"
+]
+
 [project.scripts]
 depvex = "depvex.cli:main"
 
