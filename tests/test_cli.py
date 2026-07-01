@@ -30,4 +30,3 @@ def test_check_returns_non_zero_when_requirements_are_outdated() -> None:
         exit_code = cli.check(tmpdir)
 
         assert exit_code != 0
-

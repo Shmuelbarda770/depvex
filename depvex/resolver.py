@@ -41,7 +41,7 @@ class DependencyResolver:
         return importlib.util.find_spec(module_name) is not None
 
     @lru_cache(maxsize=256)
-    def get_local_version(self, module_name: str):
+    def get_local_version(self, module_name: str)-> str | None:
         try:
             result = subprocess.check_output(["pip", "show", module_name], text=True)
             for line in result.splitlines():
@@ -52,7 +52,7 @@ class DependencyResolver:
         return None
 
     @lru_cache(maxsize=256)
-    def get_pypi_version(self, module_name: str):
+    def get_pypi_version(self, module_name: str) -> str | None:
         try:
             url = f"https://pypi.org/pypi/{module_name}/json"
             with urllib.request.urlopen(url, timeout=3) as response:
@@ -115,11 +115,17 @@ class DependencyResolver:
         except (OSError, SyntaxError):
             return ()
 
-    def rebuild_requirements(self, root: str = ".", output_path: str | None = None, prune_stale: bool = True) -> list[str]:
+    def rebuild_requirements(
+        self, root: str = ".", output_path: str | None = None, prune_stale: bool = True
+    ) -> list[str]:
         discovered = set()
 
         for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [directory for directory in dirnames if directory not in {".git", "__pycache__", ".venv", "venv", "node_modules"}]
+            dirnames[:] = [
+                directory
+                for directory in dirnames
+                if directory not in {".git", "__pycache__", ".venv", "venv", "node_modules"}
+            ]
 
             for filename in filenames:
                 if not filename.endswith(".py"):

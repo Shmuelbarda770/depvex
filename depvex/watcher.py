@@ -1,7 +1,7 @@
 import threading
 import time
 
-from watchdog.events import FileSystemEventHandler
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from depvex.resolver import DependencyResolver
@@ -38,7 +38,7 @@ class ProjectFileHandler(FileSystemEventHandler):
         print(f"[depvex] idle detected → full rescan after {self.debounce_seconds}s")
         self.resolver.rebuild_requirements(self.root)
 
-    def on_modified(self, event) -> None:
+    def on_modified(self, event:FileSystemEvent) -> None:
         if event.is_directory or not event.src_path.endswith(".py"):
             return
 
@@ -47,7 +47,7 @@ class ProjectFileHandler(FileSystemEventHandler):
 
         self._schedule_run()
 
-    def on_created(self, event) -> None:
+    def on_created(self, event:FileSystemEvent) -> None:
         if event.is_directory or not event.src_path.endswith(".py"):
             return
 

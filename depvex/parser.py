@@ -1,5 +1,7 @@
 import ast
 import sys
+
+
 class ImportExtractor:
     def __init__(self) -> None:
         self.stdlib_modules = set(getattr(sys, "stdlib_module_names", set())) | set(sys.builtin_module_names)

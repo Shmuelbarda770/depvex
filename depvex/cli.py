@@ -1,10 +1,10 @@
-from pathlib import Path
 import argparse
 import os
 import sys
+from pathlib import Path
 
-from depvex.watcher import ProjectWatcher
 from depvex.resolver import DependencyResolver
+from depvex.watcher import ProjectWatcher
 
 
 class Colors:
@@ -45,7 +45,11 @@ class DepvexCLI:
         print(Colors.colorize(f"[depvex] Starting one-time scan for {path}...", Colors.CYAN))
         resolver = DependencyResolver()
         requirements = resolver.rebuild_requirements(path)
-        print(Colors.colorize(f"[depvex] Updated requirements.txt with {len(requirements)} dependency entries.", Colors.GREEN))
+        print(
+            Colors.colorize(
+                f"[depvex] Updated requirements.txt with {len(requirements)} dependency entries.", Colors.GREEN
+            )
+        )
         return 0
 
     def check(self, path: str) -> int:
@@ -59,18 +63,32 @@ class DepvexCLI:
 
         discovered = set()
         for dirpath, dirnames, filenames in __import__("os").walk(path):
-            dirnames[:] = [directory for directory in dirnames if directory not in {".git", "__pycache__", ".venv", "venv", "node_modules"}]
+            dirnames[:] = [
+                directory
+                for directory in dirnames
+                if directory not in {".git", "__pycache__", ".venv", "venv", "node_modules"}
+            ]
             for filename in filenames:
                 if not filename.endswith(".py"):
                     continue
                 file_path = Path(dirpath) / filename
                 discovered.update(resolver._get_imports_for_file(str(file_path)))
 
-        expected_requirements = [resolver.resolve(module_name, resolver.internet_check()) for module_name in sorted(discovered) if module_name]
-        current_requirements = [line.strip() for line in output_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        expected_requirements = [
+            resolver.resolve(module_name, resolver.internet_check())
+            for module_name in sorted(discovered)
+            if module_name
+        ]
+        current_requirements = [
+            line.strip() for line in output_path.read_text(encoding="utf-8").splitlines() if line.strip()
+        ]
 
         if set(expected_requirements) != set(current_requirements):
-            print(Colors.colorize("[depvex] requirements.txt is out of date. Run 'depvex scan .' to update it.", Colors.YELLOW))
+            print(
+                Colors.colorize(
+                    "[depvex] requirements.txt is out of date. Run 'depvex scan .' to update it.", Colors.YELLOW
+                )
+            )
             return 1
 
         print(Colors.colorize("[depvex] requirements.txt is already up to date.", Colors.GREEN))
@@ -78,7 +96,11 @@ class DepvexCLI:
 
     def watch(self, path: str) -> None:
         print(Colors.colorize(f"[depvex] Starting watch mode for {path}...", Colors.CYAN))
-        print(Colors.colorize("[depvex] Depvex will keep scanning and updating requirements.txt as files change.", Colors.YELLOW))
+        print(
+            Colors.colorize(
+                "[depvex] Depvex will keep scanning and updating requirements.txt as files change.", Colors.YELLOW
+            )
+        )
 
         resolver = DependencyResolver()
         resolver.rebuild_requirements(path)

@@ -1,0 +1,44 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest  
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        pip install black mypy pylint isort pytest
+
+    - name: Format Python code with black (line length 120)
+      run: |
+         black --check --line-length 120 .
+
+    - name: Run mypy for type checking
+      run: |
+         mypy . --ignore-missing-imports --disallow-untyped-defs
+
+    # - name: Run pylint check
+    #   run: |
+    #      pylint . --rcfile=.pylintrc
+
+    - name: Check and sort imports with isort
+      run: |
+         isort --profile black --line-length 120 --check-only --diff .
+
+    # - name: Run pytest for unit tests
+    #   run: |
+        # python -m pytest 
+
