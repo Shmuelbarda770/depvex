@@ -30,6 +30,7 @@ It works like this:
 - Automatic detection of Python imports
 - Creation and updating of requirements.txt
 - Watch mode support for automatic re-scanning on file changes
+- Removes stale requirements entries when an import disappears from the project and is no longer used anywhere
 - Ignores directories such as .git, __pycache__, .venv, venv, and node_modules
 - Supports version resolution from local installs or PyPI
 
