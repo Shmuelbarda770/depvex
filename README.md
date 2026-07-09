@@ -172,21 +172,6 @@ or, if no version is found:
 package-name
 ```
 
----
-
-## Packaging and publishing to PyPI
-
-The project includes a GitHub Actions workflow that publishes it to PyPI when a tag starting with v is pushed.
-
-To use this, you need:
-
-- a secret named PYPI_TOKEN
-- a tag in the following format:
-
-```bash
-git tag v0.0.1
-git push origin v0.0.1
-```
 
 ---
 
