@@ -14,13 +14,10 @@ except ModuleNotFoundError:  # pragma: no cover - defensive fallback
     requests = None
 
 from depvex.parser import ImportExtractor
-
+from depvex.utils.read_config import project_config 
 
 class DependencyResolver:
-    CAPTIVE_PORTAL_URLS = [
-        "http://connectivitycheck.gstatic.com/generate_204",
-        "http://clients3.google.com/generate_204",
-    ]
+    CAPTIVE_PORTAL_URLS: list[str] = project_config.CAPTIVE_PORTAL_URLS
 
     def __init__(self, parser: ImportExtractor | None = None) -> None:
         self.parser = parser or ImportExtractor()
