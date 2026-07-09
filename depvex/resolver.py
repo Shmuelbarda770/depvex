@@ -1,4 +1,5 @@
 import importlib.util
+from importlib.metadata import packages_distributions
 import json
 import os
 import re
@@ -23,6 +24,10 @@ class DependencyResolver:
 
     def __init__(self, parser: ImportExtractor | None = None) -> None:
         self.parser = parser or ImportExtractor()
+        try:
+            self.top_level_distributions = packages_distributions()
+        except Exception:
+            self.top_level_distributions = {}
 
     def internet_check(self, timeout: int = 3) -> bool:
         if requests is None:
@@ -62,18 +67,30 @@ class DependencyResolver:
             return None
 
     def resolve(self, module_name: str, has_net: bool) -> str:
-        version = self.get_local_version(module_name)
+        package_name = self._module_to_package_name(module_name)
+        version = self.get_local_version(package_name)
 
         if version:
-            return f"{module_name}=={version}"
+            return f"{package_name}=={version}"
 
         if has_net:
-            latest_version = self.get_pypi_version(module_name)
+            latest_version = self.get_pypi_version(package_name)
             if latest_version:
-                return f"{module_name}=={latest_version}"
-            return module_name
+                return f"{package_name}=={latest_version}"
+            return package_name
 
-        return module_name
+        return package_name
+
+    def _module_to_package_name(self, module_name: str) -> str:
+        normalized = self._normalize_module_name(module_name)
+        if not normalized:
+            return normalized
+
+        candidate = self.top_level_distributions.get(normalized)
+        if candidate:
+            return candidate[0]
+
+        return normalized
 
     def _normalize_module_name(self, module_name: str) -> str:
         name = module_name.strip()
@@ -152,21 +169,21 @@ class DependencyResolver:
             }
 
             current_normalized_names = {
-                self._normalize_module_name(module_name)
+                self._normalize_module_name(self._module_to_package_name(module_name))
                 for module_name in discovered
-                if self._normalize_module_name(module_name)
+                if self._normalize_module_name(self._module_to_package_name(module_name))
             }
 
             for module_name in sorted(discovered):
                 if not module_name:
                     continue
 
-                normalized = self._normalize_module_name(module_name)
-                if not normalized:
+                normalized_package = self._normalize_module_name(self._module_to_package_name(module_name))
+                if not normalized_package:
                     continue
 
-                if normalized in existing_by_name and normalized in current_normalized_names:
-                    requirements.append(existing_by_name[normalized])
+                if normalized_package in existing_by_name and normalized_package in current_normalized_names:
+                    requirements.append(existing_by_name[normalized_package])
                 else:
                     requirements.append(self.resolve(module_name, has_net))
 
