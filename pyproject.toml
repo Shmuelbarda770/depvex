@@ -9,6 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "depvex"
+readme = "README_PYPI.md"
 dynamic = ["version"]
 description = "Dependency and environment checker tool"
 readme = "README.md"
