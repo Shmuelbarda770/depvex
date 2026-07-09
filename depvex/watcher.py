@@ -5,7 +5,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from depvex.resolver import DependencyResolver
-
+from depvex.utils.read_config import project_config
 
 class ProjectFileHandler(FileSystemEventHandler):
     def __init__(self, root: str, resolver: DependencyResolver | None = None, debounce_seconds: float = 1.5) -> None:
@@ -58,7 +58,7 @@ class ProjectFileHandler(FileSystemEventHandler):
 
 
 class ProjectWatcher:
-    def __init__(self, root: str, resolver: DependencyResolver | None = None, debounce_seconds: float = 1.5) -> None:
+    def __init__(self, root: str, resolver: DependencyResolver | None = None, debounce_seconds: float = project_config.debounce_seconds) -> None:
         self.root = root
         self.resolver = resolver or DependencyResolver()
         self.debounce_seconds = debounce_seconds

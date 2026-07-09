@@ -1,3 +1,8 @@
 {
-    "enternt_timeout": 3
+    "enternt_timeout": 3,
+    "debounce_seconds":1.5,
+    "CAPTIVE_PORTAL_URLS": [
+        "http://connectivitycheck.gstatic.com/generate_204",
+        "http://clients3.google.com/generate_204"
+    ]
 }
