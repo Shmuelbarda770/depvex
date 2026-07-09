@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 
 from depvex.cli import DepvexCLI
+from depvex.parser import ImportExtractor
 
 
 def test_scan_updates_requirements_for_a_single_run() -> None:
@@ -30,3 +31,10 @@ def test_check_returns_non_zero_when_requirements_are_outdated() -> None:
         exit_code = cli.check(tmpdir)
 
         assert exit_code != 0
+
+
+def test_imports_marked_with_ignore_comment_are_skipped() -> None:
+    extractor = ImportExtractor()
+    code = "import requests  # ignore depvex\nimport flet\n"
+
+    assert extractor.extract_imports(code) == ["flet"]
