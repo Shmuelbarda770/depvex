@@ -4,7 +4,7 @@ requires = [
   "wheel",
   "setuptools_scm[toml]>=8"
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "setupto ols.build_meta"
 
 
 [project]
