@@ -4,7 +4,7 @@ requires = [
   "wheel",
   "setuptools_scm[toml]>=8"
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "setupto ols.build_meta"
 
 
 [project]
@@ -12,7 +12,6 @@ name = "depvex"
 readme = "README_PYPI.md"
 dynamic = ["version"]
 description = "Dependency and environment checker tool"
-readme = "README.md"
 requires-python = ">=3.11"
 
 authors = [
