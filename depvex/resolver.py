@@ -14,10 +14,16 @@ except ModuleNotFoundError:  # pragma: no cover - defensive fallback
     requests = None
 
 from depvex.parser import ImportExtractor
-from depvex.utils.read_config import project_config 
+from depvex.utils.read_config import project_config
+
 
 class DependencyResolver:
-    CAPTIVE_PORTAL_URLS: list[str] = project_config.CAPTIVE_PORTAL_URLS
+    CAPTIVE_PORTAL_URLS: list[str] = getattr(
+        project_config,
+        "CAPTIVE_PORTAL_URLS",
+        ["http://connectivitycheck.gstatic.com/generate_204"],
+    )
+    MICRO_SERVICE_FOLDERS: list[str] = getattr(project_config, "micro_servi_folders", [])
 
     def __init__(self, parser: ImportExtractor | None = None) -> None:
         self.parser = parser or ImportExtractor()
@@ -43,7 +49,7 @@ class DependencyResolver:
         return importlib.util.find_spec(module_name) is not None
 
     @lru_cache(maxsize=256)
-    def get_local_version(self, module_name: str)-> str | None:
+    def get_local_version(self, module_name: str) -> str | None:
         try:
             result = subprocess.check_output(["pip", "show", module_name], text=True)
             for line in result.splitlines():
@@ -108,6 +114,10 @@ class DependencyResolver:
             return [line.strip() for line in handle if line.strip() and not line.strip().startswith("#")]
 
     def write_req(self, lines, path: str = "requirements.txt") -> None:
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+
         with open(path, "w", encoding="utf-8") as handle:
             for line in sorted(set(lines)):
                 handle.write(line + "\n")
@@ -129,27 +139,43 @@ class DependencyResolver:
         except (OSError, SyntaxError):
             return ()
 
-    def rebuild_requirements(
-        self, root: str = ".", output_path: str | None = None, prune_stale: bool = True
+    def _get_active_service_folders(self, root: str) -> list[str]:
+        """מחזיר את תיקיות המיקרו-שירות שמוגדרות ב-config.json וגם קיימות בפועל תחת root."""
+        return [
+            folder
+            for folder in self.MICRO_SERVICE_FOLDERS
+            if os.path.isdir(os.path.join(root, folder))
+        ]
+
+    def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None):
+        exclude_dirs = exclude_dirs or set()
+        base_skip = {".git", "__pycache__", ".venv", "venv", "node_modules"}
+        root_abs = os.path.abspath(root)
+
+        for dirpath, dirnames, filenames in os.walk(root):
+            if os.path.abspath(dirpath) == root_abs:
+                dirnames[:] = [d for d in dirnames if d not in base_skip and d not in exclude_dirs]
+            else:
+                dirnames[:] = [d for d in dirnames if d not in base_skip]
+
+            for filename in filenames:
+                if filename.endswith(".py"):
+                    yield os.path.join(dirpath, filename)
+
+    def _rebuild_single(
+        self,
+        root: str,
+        output_path: str | None = None,
+        prune_stale: bool = True,
+        exclude_dirs: set[str] | None = None,
     ) -> list[str]:
         discovered = set()
 
-        for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [
-                directory
-                for directory in dirnames
-                if directory not in {".git", "__pycache__", ".venv", "venv", "node_modules"}
-            ]
-
-            for filename in filenames:
-                if not filename.endswith(".py"):
-                    continue
-
-                file_path = os.path.join(dirpath, filename)
-                try:
-                    discovered.update(self._get_imports_for_file(file_path))
-                except (OSError, SyntaxError):
-                    continue
+        for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
+            try:
+                discovered.update(self._get_imports_for_file(file_path))
+            except (OSError, SyntaxError):
+                continue
 
         if output_path is None:
             output_path = os.path.join(root, "requirements.txt")
@@ -184,10 +210,6 @@ class DependencyResolver:
                 else:
                     requirements.append(self.resolve(module_name, has_net))
 
-            for existing_name in sorted(existing_by_name):
-                if existing_name not in current_normalized_names:
-                    continue
-
             self.write_req(requirements, path=output_path)
             return requirements
 
@@ -197,6 +219,38 @@ class DependencyResolver:
 
         self.write_req(requirements, path=output_path)
         return requirements
+
+    def rebuild_requirements(
+        self, root: str = ".", output_path: str | None = None, prune_stale: bool = True
+    ) -> dict[str, list[str]] | list[str]:
+        """
+        בונה מחדש את requirements.txt לפרויקט ב-root.
+
+        אם micro_servi_folders מוגדר ב-config.json וקיימת בפועל לפחות תיקייה אחת
+        מהרשימה תחת root, כל תיקייה כזו נחשבת מיקרו-שירות עצמאי ומקבלת
+        requirements.txt משלה, מחושב רק מהאימפורטים שנמצאים בתוכה.
+        כל מה שנשאר מחוץ לתיקיות השירות ממשיך לקובץ הגלובלי (root).
+        אם output_path נשלח במפורש - זו קריאה ל"קובץ יחיד" קלאסי, בלי פיצול.
+        """
+        service_folders = self._get_active_service_folders(root)
+
+        if not service_folders or output_path is not None:
+            return self._rebuild_single(root, output_path, prune_stale)
+
+        results: dict[str, list[str]] = {}
+
+        for service in service_folders:
+            service_root = os.path.join(root, service)
+            service_output = os.path.join(service_root, "requirements.txt")
+            results[service] = self._rebuild_single(service_root, service_output, prune_stale)
+
+        results["__root__"] = self._rebuild_single(
+            root,
+            os.path.join(root, "requirements.txt"),
+            prune_stale,
+            exclude_dirs=set(service_folders),
+        )
+        return results
 
     def monitor_project(self, module_list, interval: int = 2) -> None:
         last_req = None

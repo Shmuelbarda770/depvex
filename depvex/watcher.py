@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 
@@ -7,8 +8,13 @@ from watchdog.observers import Observer
 from depvex.resolver import DependencyResolver
 from depvex.utils.read_config import project_config
 
+DEFAULT_DEBOUNCE_SECONDS = getattr(project_config, "debounce_seconds", 1.5)
+
+
 class ProjectFileHandler(FileSystemEventHandler):
-    def __init__(self, root: str, resolver: DependencyResolver | None = None, debounce_seconds: float = 1.5) -> None:
+    def __init__(
+        self, root: str, resolver: DependencyResolver | None = None, debounce_seconds: float = DEFAULT_DEBOUNCE_SECONDS
+    ) -> None:
         super().__init__()
         self.root = root
         self.resolver = resolver or DependencyResolver()
@@ -26,6 +32,14 @@ class ProjectFileHandler(FileSystemEventHandler):
             self._timer.daemon = True
             self._timer.start()
 
+    def _service_for_file(self, file_path: str, service_folders: list[str]) -> str | None:
+        if not service_folders:
+            return None
+
+        rel_path = os.path.relpath(file_path, self.root)
+        first_part = rel_path.split(os.sep)[0]
+        return first_part if first_part in service_folders else None
+
     def _process_pending(self) -> None:
         with self._lock:
             pending_files = list(self._pending_files)
@@ -35,10 +49,35 @@ class ProjectFileHandler(FileSystemEventHandler):
         if not pending_files:
             return
 
-        print(f"[depvex] idle detected → full rescan after {self.debounce_seconds}s")
-        self.resolver.rebuild_requirements(self.root)
+        service_folders = self.resolver._get_active_service_folders(self.root)
 
-    def on_modified(self, event:FileSystemEvent) -> None:
+        if not service_folders:
+            print(f"[depvex] idle detected → full rescan after {self.debounce_seconds}s")
+            self.resolver.rebuild_requirements(self.root)
+            return
+
+        affected_services: set[str] = set()
+        root_changed = False
+
+        for file_path in pending_files:
+            service = self._service_for_file(file_path, service_folders)
+            if service:
+                affected_services.add(service)
+            else:
+                root_changed = True
+
+        for service in affected_services:
+            service_root = os.path.join(self.root, service)
+            print(f"[depvex] idle detected → rescan for service '{service}'")
+            self.resolver._rebuild_single(service_root, os.path.join(service_root, "requirements.txt"))
+
+        if root_changed:
+            print("[depvex] idle detected → rescan for root")
+            self.resolver._rebuild_single(
+                self.root, os.path.join(self.root, "requirements.txt"), exclude_dirs=set(service_folders)
+            )
+
+    def on_modified(self, event: FileSystemEvent) -> None:
         if event.is_directory or not event.src_path.endswith(".py"):
             return
 
@@ -47,7 +86,7 @@ class ProjectFileHandler(FileSystemEventHandler):
 
         self._schedule_run()
 
-    def on_created(self, event:FileSystemEvent) -> None:
+    def on_created(self, event: FileSystemEvent) -> None:
         if event.is_directory or not event.src_path.endswith(".py"):
             return
 
@@ -58,7 +97,9 @@ class ProjectFileHandler(FileSystemEventHandler):
 
 
 class ProjectWatcher:
-    def __init__(self, root: str, resolver: DependencyResolver | None = None, debounce_seconds: float = project_config.debounce_seconds) -> None:
+    def __init__(
+        self, root: str, resolver: DependencyResolver | None = None, debounce_seconds: float = DEFAULT_DEBOUNCE_SECONDS
+    ) -> None:
         self.root = root
         self.resolver = resolver or DependencyResolver()
         self.debounce_seconds = debounce_seconds

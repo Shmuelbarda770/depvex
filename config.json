@@ -4,5 +4,6 @@
     "CAPTIVE_PORTAL_URLS": [
         "http://connectivitycheck.gstatic.com/generate_204",
         "http://clients3.google.com/generate_204"
-    ]
+    ],
+    "micro_servi_folders": ["serv"]
 }
