@@ -5,5 +5,5 @@
         "http://connectivitycheck.gstatic.com/generate_204",
         "http://clients3.google.com/generate_204"
     ],
-    "micro_servi_folders": ["serv"]
+    "micro_servi_folders": ["serv", "air", "ground", "share"]
 }
