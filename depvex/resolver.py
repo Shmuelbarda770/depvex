@@ -15,6 +15,7 @@ except ModuleNotFoundError:  # pragma: no cover - defensive fallback
 
 from depvex.parser import ImportExtractor
 from depvex.utils.read_config import project_config
+from depvex.utils.read_yaml_config import read_yaml_config
 
 
 class DependencyResolver:
@@ -23,10 +24,14 @@ class DependencyResolver:
         "CAPTIVE_PORTAL_URLS",
         ["http://connectivitycheck.gstatic.com/generate_204"],
     )
-    MICRO_SERVICE_FOLDERS: list[str] = getattr(project_config, "micro_servi_folders", [])
 
-    def __init__(self, parser: ImportExtractor | None = None) -> None:
+    def __init__(self, parser: ImportExtractor | None = None, root: str = ".") -> None:
         self.parser = parser or ImportExtractor()
+        self.root = root
+
+        yaml_config = read_yaml_config(start_dir=root)
+        self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
+
         try:
             self.top_level_distributions = packages_distributions()
         except Exception:
@@ -127,7 +132,7 @@ class DependencyResolver:
             stat = os.stat(file_path)
             cache_key = (file_path, stat.st_mtime_ns)
             return self._get_imports_for_file_cached(cache_key)
-        except (OSError, SyntaxError):
+        except (OSError, SyntaxError, UnicodeDecodeError):
             return ()
 
     @lru_cache(maxsize=256)
@@ -136,11 +141,11 @@ class DependencyResolver:
         try:
             with open(file_path, "r", encoding="utf-8") as handle:
                 return tuple(self.parser.extract_imports(handle.read()))
-        except (OSError, SyntaxError):
+        except (OSError, SyntaxError, UnicodeDecodeError):
             return ()
 
     def _get_active_service_folders(self, root: str) -> list[str]:
-        """מחזיר את תיקיות המיקרו-שירות שמוגדרות ב-config.json וגם קיימות בפועל תחת root."""
+        """מחזיר את תיקיות המיקרו-שירות שמוגדרות ב-depvex.yaml וגם קיימות בפועל תחת root."""
         return [
             folder
             for folder in self.MICRO_SERVICE_FOLDERS
@@ -159,7 +164,7 @@ class DependencyResolver:
                 dirnames[:] = [d for d in dirnames if d not in base_skip]
 
             for filename in filenames:
-                if filename.endswith(".py"):
+                if filename.endswith(".py") and not filename.startswith("."):
                     yield os.path.join(dirpath, filename)
 
     def _rebuild_single(
@@ -174,7 +179,7 @@ class DependencyResolver:
         for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
             try:
                 discovered.update(self._get_imports_for_file(file_path))
-            except (OSError, SyntaxError):
+            except (OSError, SyntaxError, UnicodeDecodeError):
                 continue
 
         if output_path is None:
@@ -226,9 +231,9 @@ class DependencyResolver:
         """
         בונה מחדש את requirements.txt לפרויקט ב-root.
 
-        אם micro_servi_folders מוגדר ב-config.json וקיימת בפועל לפחות תיקייה אחת
-        מהרשימה תחת root, כל תיקייה כזו נחשבת מיקרו-שירות עצמאי ומקבלת
-        requirements.txt משלה, מחושב רק מהאימפורטים שנמצאים בתוכה.
+        אם micro_servi_folders מוגדר ב-depvex.yaml (מוגדר בזמן יצירת ה-resolver,
+        לפי הroot שהועבר לו) וקיימת בפועל לפחות תיקייה אחת מהרשימה תחת root,
+        כל תיקייה כזו נחשבת מיקרו-שירות עצמאי ומקבלת requirements.txt משלה.
         כל מה שנשאר מחוץ לתיקיות השירות ממשיך לקובץ הגלובלי (root).
         אם output_path נשלח במפורש - זו קריאה ל"קובץ יחיד" קלאסי, בלי פיצול.
         """
