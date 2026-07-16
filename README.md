@@ -27,6 +27,8 @@ as pip-tools, Poetry, or uv.
 - Recursively scans `.py` files, excluding `.git`, `__pycache__`, `.venv`,
   `venv`, and `node_modules`.
 - Supports additional ignored directories through `depvex.yaml`.
+- Supports `ignore_packages` in YAML, matching either an import module or its
+  resolved distribution name.
 - Maps installed import modules to their distribution names when metadata is
   available (for example, `yaml` to `PyYAML`).
 - Resolves a version from installed package metadata without launching `pip` or
@@ -35,6 +37,10 @@ as pip-tools, Poetry, or uv.
   version.
 - Preserves an existing requirements entry when the same package is still
   imported, and removes entries for imports that disappeared.
+- Uses the same dependency calculation for `scan` and `check`.
+- Explains failed checks with missing, stale, and changed requirement entries.
+- Can explicitly sync and verify `[project].dependencies` in `pyproject.toml`.
+- Reports dependencies by service and identifies dependencies shared by groups.
 - Watches created and modified Python files and debounces repeated events.
 - Uses colour only when the terminal supports it; set `NO_COLOR=1` to disable
   colour explicitly.
@@ -65,6 +71,7 @@ The new CLI interface uses option-style commands:
 depvex --scan .
 depvex --check .
 depvex --watch .
+depvex --report .
 ```
 
 | Command | Purpose | Result |
@@ -72,6 +79,15 @@ depvex --watch .
 | `depvex --scan [path]` | Scan once. | Creates or updates requirements files. |
 | `depvex --check [path]` | Verify scanned dependencies. | Returns `0` when current and `1` when a requirements file is missing or differs. |
 | `depvex --watch [path]` | Scan once, then watch the path. | Updates affected requirements files after the debounce delay. |
+| `depvex --report [path]` | Inspect dependency ownership. | Lists root/service dependencies and shared packages without writing files. |
+
+Add `--pyproject` to `--scan` or `--check` to sync or verify the selected
+directory's `[project].dependencies` list:
+
+```bash
+depvex --scan --pyproject .
+depvex --check --pyproject .
+```
 
 `path` defaults to the current directory.
 
@@ -110,6 +126,10 @@ micro_servi_folders:
 ignore_dirs:
   - tests
   - generated
+
+ignore_packages:
+  - pytest
+  - depvex
 ```
 
 Given this structure:
@@ -139,7 +159,7 @@ children of the scanned root.
 ### Configuration sources
 
 - `depvex.yaml` / `depvex.yml`: `ignore_dirs` and
-  `micro_servi_folders`.
+  `micro_servi_folders`, plus `ignore_packages`.
 - `config.json` / `depvex.json`: `CAPTIVE_PORTAL_URLS` for the connectivity
   check and `debounce_seconds` for watch mode.
 
@@ -163,10 +183,10 @@ release.
   run: depvex --check .
 ```
 
-At present, `check` compares its newly resolved entries with the file contents.
-Its output reports only that the file is out of date; it does not yet list the
-missing, stale, or changed entries. Use `scan`, inspect the resulting diff, and
-commit the intended requirements changes.
+When a check fails, it prints each missing, stale, and version-changed entry.
+Use `scan`, inspect the resulting diff, and commit the intended requirements
+changes. Add `--pyproject` when the project dependency list is also part of the
+reviewed source of truth.
 
 ## Limitations
 
@@ -184,11 +204,7 @@ commit the intended requirements changes.
 
 The next milestones are:
 
-1. Use one shared calculation for scan and check so CI cannot fail merely
-   because dependency resolution happened in a different environment.
-2. Print an actionable check diff: missing, stale, and changed entries per
-   service.
-3. Make microservice configuration explicit and consistent, including a
+1. Make microservice configuration explicit and consistent, including a
    correctly named `micro_service_folders` key and documented migration.
-4. Add automated coverage for single-project, microservice, watch, and CI
+2. Add automated coverage for single-project, microservice, watch, and CI
    workflows.
