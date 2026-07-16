@@ -1,8 +1,11 @@
 import tempfile
 from pathlib import Path
 
-from depvex.cli import DepvexCLI
-from depvex.parser import ImportExtractor
+import pytest
+
+from depvex.cli import DepvexCLI  # ignore depvex
+from depvex.parser import ImportExtractor  # ignore depvex
+from depvex.resolver import DependencyResolver  # ignore depvex
 
 
 def test_scan_updates_requirements_for_a_single_run() -> None:
@@ -38,3 +41,43 @@ def test_imports_marked_with_ignore_comment_are_skipped() -> None:
     code = "import requests  # ignore depvex\nimport flet\n"
 
     assert extractor.extract_imports(code) == ["flet"]
+
+
+def test_ignore_packages_excludes_a_dependency_from_requirements() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sample_file = Path(tmpdir) / "sample.py"
+        sample_file.write_text("import requests\n", encoding="utf-8")
+
+        resolver = DependencyResolver(root=tmpdir)
+        resolver.IGNORE_PACKAGES = {"requests"}
+
+        assert resolver.requirements_for(tmpdir) == []
+
+
+def test_check_prints_stale_dependencies(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sample_file = Path(tmpdir) / "sample.py"
+        sample_file.write_text("import requests\n", encoding="utf-8")
+        (Path(tmpdir) / "requirements.txt").write_text("old-package==1.0\n", encoding="utf-8")
+        monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+
+        assert DepvexCLI().check(tmpdir) == 1
+        assert "stale: old-package==1.0" in capsys.readouterr().out
+
+
+def test_pyproject_dependencies_can_be_written_and_read() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pyproject_path = Path(tmpdir) / "pyproject.toml"
+        pyproject_path.write_text('[project]\nname = "sample"\ndependencies = ["old-package==1.0"]\n', encoding="utf-8")
+
+        resolver = DependencyResolver(root=tmpdir)
+        resolver.write_pyproject_dependencies(str(pyproject_path), ["requests==2.34.2"])
+
+        assert resolver.read_pyproject_dependencies(str(pyproject_path)) == ["requests==2.34.2"]
+
+
+def test_report_and_pyproject_flags_are_available() -> None:
+    args = DepvexCLI().parser.parse_args(["--report", "--pyproject", "."])
+
+    assert args.command == "report"
+    assert args.pyproject is True

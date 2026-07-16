@@ -1,3 +1,2 @@
 ignore_dirs:
   - test_project
-  - tests

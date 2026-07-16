@@ -2,6 +2,7 @@ import importlib.util
 import os
 import re
 import time
+import tomllib
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
@@ -34,6 +35,11 @@ class DependencyResolver:
         yaml_config = read_yaml_config(start_dir=root)
         self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
         self.IGNORE_DIRS: set[str] = set(getattr(yaml_config, "ignore_dirs", []))
+        self.IGNORE_PACKAGES: set[str] = {
+            self._normalize_module_name(package)
+            for package in getattr(yaml_config, "ignore_packages", [])
+            if isinstance(package, str) and self._normalize_module_name(package)
+        }
 
         try:
             self.top_level_distributions = packages_distributions()
@@ -46,6 +52,11 @@ class DependencyResolver:
         rel_path = rel_path.replace(os.sep, "/")
         name = os.path.basename(rel_path)
         return name in self.IGNORE_DIRS or rel_path in self.IGNORE_DIRS
+
+    def _is_ignored_package(self, module_name: str) -> bool:
+        module = self._normalize_module_name(module_name)
+        package = self._normalize_module_name(self._module_to_package_name(module_name))
+        return module in self.IGNORE_PACKAGES or package in self.IGNORE_PACKAGES
 
     def internet_check(self, timeout: int = 3) -> bool:
         if requests is None:
@@ -157,6 +168,12 @@ class DependencyResolver:
     def _get_active_service_folders(self, root: str) -> list[str]:
         return [folder for folder in self.MICRO_SERVICE_FOLDERS if os.path.isdir(os.path.join(root, folder))]
 
+    def discover_imports(self, root: str, exclude_dirs: set[str] | None = None) -> set[str]:
+        discovered: set[str] = set()
+        for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
+            discovered.update(self._get_imports_for_file(file_path))
+        return {module_name for module_name in discovered if not self._is_ignored_package(module_name)}
+
     def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None) -> Iterator[str]:
         exclude_dirs = exclude_dirs or set()
         base_skip = {".git", "__pycache__", ".venv", "venv", "node_modules"}
@@ -176,25 +193,19 @@ class DependencyResolver:
                 if filename.endswith(".py") and not filename.startswith("."):
                     yield os.path.join(dirpath, filename)
 
-    def _rebuild_single(
+    def requirements_for(
         self,
         root: str,
         output_path: str | None = None,
         prune_stale: bool = True,
         exclude_dirs: set[str] | None = None,
     ) -> list[str]:
-        discovered: set[str] = set()
-
-        for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
-            try:
-                discovered.update(self._get_imports_for_file(file_path))
-            except (OSError, SyntaxError, UnicodeDecodeError):
-                continue
+        discovered = self.discover_imports(root, exclude_dirs=exclude_dirs)
 
         if output_path is None:
             output_path = os.path.join(root, "requirements.txt")
 
-        requirements = []
+        requirements: list[str] = []
         has_net = self.internet_check()
 
         if prune_stale and os.path.exists(output_path):
@@ -205,12 +216,6 @@ class DependencyResolver:
                 if self._normalize_module_name(entry)
             }
 
-            current_normalized_names = {
-                self._normalize_module_name(self._module_to_package_name(module_name))
-                for module_name in discovered
-                if self._normalize_module_name(self._module_to_package_name(module_name))
-            }
-
             for module_name in sorted(discovered):
                 if not module_name:
                     continue
@@ -219,20 +224,62 @@ class DependencyResolver:
                 if not normalized_package:
                     continue
 
-                if normalized_package in existing_by_name and normalized_package in current_normalized_names:
+                if normalized_package in existing_by_name:
                     requirements.append(existing_by_name[normalized_package])
                 else:
                     requirements.append(self.resolve(module_name, has_net))
 
-            self.write_req(requirements, path=output_path)
             return requirements
 
         for module_name in sorted(discovered):
             if module_name:
                 requirements.append(self.resolve(module_name, has_net))
 
-        self.write_req(requirements, path=output_path)
         return requirements
+
+    def _rebuild_single(
+        self,
+        root: str,
+        output_path: str | None = None,
+        prune_stale: bool = True,
+        exclude_dirs: set[str] | None = None,
+    ) -> list[str]:
+        requirements = self.requirements_for(root, output_path, prune_stale, exclude_dirs)
+        self.write_req(requirements, path=output_path or os.path.join(root, "requirements.txt"))
+        return requirements
+
+    def read_pyproject_dependencies(self, path: str) -> list[str]:
+        try:
+            with open(path, "rb") as handle:
+                project = tomllib.load(handle).get("project", {})
+        except (OSError, tomllib.TOMLDecodeError):
+            return []
+
+        dependencies = project.get("dependencies", [])
+        return (
+            [dependency for dependency in dependencies if isinstance(dependency, str)]
+            if isinstance(dependencies, list)
+            else []
+        )
+
+    def write_pyproject_dependencies(self, path: str, dependencies: Iterable[str]) -> None:
+        with open(path, "r", encoding="utf-8") as handle:
+            content = handle.read()
+
+        project_match = re.search(r"(?ms)^\[project\]\n(?P<body>.*?)(?=^\[|\Z)", content)
+        if project_match is None:
+            raise ValueError(f"{path} does not contain a [project] table")
+
+        dependency_lines = "\n".join(f'    "{dependency}",' for dependency in sorted(set(dependencies)))
+        replacement = f"dependencies = [\n{dependency_lines}\n]"
+        project_body = project_match.group("body")
+        updated_body, replacements = re.subn(r"(?ms)^dependencies\s*=\s*\[.*?\]", replacement, project_body, count=1)
+        if replacements == 0:
+            updated_body = f"{project_body.rstrip()}\n\n{replacement}\n"
+
+        updated_content = f"{content[:project_match.start('body')]}{updated_body}{content[project_match.end('body'):]}"
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(updated_content)
 
     def rebuild_requirements(
         self, root: str = ".", output_path: str | None = None, prune_stale: bool = True
