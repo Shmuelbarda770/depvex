@@ -1,9 +1,7 @@
 import importlib.util
-import json
 import os
 import re
 import time
-import urllib.request
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
@@ -74,12 +72,16 @@ class DependencyResolver:
 
     @lru_cache(maxsize=256)
     def get_pypi_version(self, module_name: str) -> str | None:
+        if requests is None:
+            return None
+
         try:
             url = f"https://pypi.org/pypi/{module_name}/json"
-            with urllib.request.urlopen(url, timeout=3) as response:
-                data = json.load(response)
-            return data["info"]["version"]
-        except (OSError, KeyError, ValueError):
+            response = requests.get(url, timeout=3)
+            response.raise_for_status()
+            version = response.json()["info"]["version"]
+            return version if isinstance(version, str) else None
+        except (requests.RequestException, KeyError, TypeError, ValueError):
             return None
 
     def resolve(self, module_name: str, has_net: bool) -> str:
