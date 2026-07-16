@@ -40,7 +40,7 @@ jobs:
 
     - name : Check for dependency updates with depvex
       run: |
-         depvex --check
+         depvex check .
     # - name: Run pytest for unit tests
     #   run: |
         # python -m pytest
