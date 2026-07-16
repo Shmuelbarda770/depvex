@@ -1,11 +1,10 @@
-from pathlib import Path
 import argparse
 import sys
-
-from depvex.resolver import DependencyResolver  # ignore depvex
-from depvex.watcher import ProjectWatcher  # ignore depvex
+from pathlib import Path
 
 from depvex.models.base_model import Colors  # ignore depvex
+from depvex.resolver import DependencyResolver  # ignore depvex
+from depvex.watcher import ProjectWatcher  # ignore depvex
 
 
 class DepvexCLI:

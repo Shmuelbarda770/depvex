@@ -1,13 +1,13 @@
 import importlib.util
-from importlib.metadata import packages_distributions
 import json
 import os
 import re
 import subprocess
 import time
 import urllib.request
-from functools import lru_cache
 from collections.abc import Iterable, Iterator
+from functools import lru_cache
+from importlib.metadata import packages_distributions
 from typing import Any
 
 requests: Any | None = None
