@@ -2,10 +2,10 @@ from pathlib import Path
 import argparse
 import sys
 
-from depvex.resolver import DependencyResolver # ignore depvex
-from depvex.watcher import ProjectWatcher # ignore depvex
+from depvex.resolver import DependencyResolver  # ignore depvex
+from depvex.watcher import ProjectWatcher  # ignore depvex
 
-from depvex.models.base_model import Colors # ignore depvex
+from depvex.models.base_model import Colors  # ignore depvex
 
 
 class DepvexCLI:
@@ -26,7 +26,9 @@ class DepvexCLI:
         watch_parser.add_argument("path", nargs="?", default=".")
         return parser
 
-    def _discover_imports(self, resolver: DependencyResolver, root: str, exclude_dirs: set[str] | None = None) -> set[str]:
+    def _discover_imports(
+        self, resolver: DependencyResolver, root: str, exclude_dirs: set[str] | None = None
+    ) -> set[str]:
         discovered = set()
         for file_path in resolver._walk_python_files(root, exclude_dirs=exclude_dirs):
             discovered.update(resolver._get_imports_for_file(file_path))

@@ -13,9 +13,9 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - defensive fallback
     requests = None
 
-from depvex.parser import ImportExtractor # ignore depvex
-from depvex.utils.read_config import project_config # ignore depvex
-from depvex.utils.read_yaml_config import read_yaml_config # ignore depvex
+from depvex.parser import ImportExtractor  # ignore depvex
+from depvex.utils.read_config import project_config  # ignore depvex
+from depvex.utils.read_yaml_config import read_yaml_config  # ignore depvex
 
 
 class DependencyResolver:
@@ -37,6 +37,7 @@ class DependencyResolver:
             self.top_level_distributions = packages_distributions()
         except Exception:
             self.top_level_distributions = {}
+
     def _is_ignored_dir(self, rel_path: str) -> bool:
         if not self.IGNORE_DIRS:
             return False
@@ -153,11 +154,7 @@ class DependencyResolver:
 
     def _get_active_service_folders(self, root: str) -> list[str]:
         """מחזיר את תיקיות המיקרו-שירות שמוגדרות ב-depvex.yaml וגם קיימות בפועל תחת root."""
-        return [
-            folder
-            for folder in self.MICRO_SERVICE_FOLDERS
-            if os.path.isdir(os.path.join(root, folder))
-        ]
+        return [folder for folder in self.MICRO_SERVICE_FOLDERS if os.path.isdir(os.path.join(root, folder))]
 
     def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None):
         exclude_dirs = exclude_dirs or set()
@@ -172,10 +169,7 @@ class DependencyResolver:
             else:
                 dirnames[:] = [d for d in dirnames if d not in base_skip]
 
-            dirnames[:] = [
-                d for d in dirnames
-                if not self._is_ignored_dir(d if rel_dir == "." else f"{rel_dir}/{d}")
-            ]
+            dirnames[:] = [d for d in dirnames if not self._is_ignored_dir(d if rel_dir == "." else f"{rel_dir}/{d}")]
 
             for filename in filenames:
                 if filename.endswith(".py") and not filename.startswith("."):
