@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from depvex.cli import DepvexCLI # ignore depvex
-from depvex.parser import ImportExtractor # ignore depvex
-from depvex.resolver import DependencyResolver # ignore depvex
+from depvex.cli import DepvexCLI  # ignore depvex
+from depvex.parser import ImportExtractor  # ignore depvex
+from depvex.resolver import DependencyResolver  # ignore depvex
 
 
 def test_scan_updates_requirements_for_a_single_run() -> None:
