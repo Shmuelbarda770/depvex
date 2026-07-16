@@ -15,28 +15,17 @@ def _find_config_upwards(start: Path) -> Path | None:
             if candidate.is_file():
                 return candidate
 
-        if current.parent == current:  # הגענו לשורש (/ או C:\)
+        if current.parent == current:
             return None
 
         current = current.parent
 
 
 def read_config(file_path: str | None = None, start_dir: str | None = None) -> SimpleNamespace:
-    """
-    קורא קובץ קונפיג JSON ומחזיר אותו כ-SimpleNamespace.
-
-    אם file_path נשלח במפורש - נקרא בדיוק אותו (התנהגות ישנה, שימושי לטסטים).
-    אחרת - מחפש config.json / depvex.json החל מ-start_dir (ברירת מחדל: cwd)
-    ועולה למעלה בעץ התיקיות עד שמוצא או מגיע לשורש.
-
-    Args:
-        file_path (str | None): נתיב מפורש לקובץ קונפיג. אם None - מחפש אוטומטית.
-        start_dir (str | None): תיקיית התחלה לחיפוש. ברירת מחדל: תיקיית העבודה הנוכחית.
-    """
     if file_path is not None:
         target_path = Path(file_path)
     else:
-        target_path = _find_config_upwards(Path(start_dir or "."))
+        target_path: Path | None = _find_config_upwards(Path(start_dir or "."))
 
     if target_path is None:
         print("[depvex] No config.json found in this directory or any parent directory. Using defaults.")

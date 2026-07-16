@@ -153,7 +153,6 @@ class DependencyResolver:
             return ()
 
     def _get_active_service_folders(self, root: str) -> list[str]:
-        """מחזיר את תיקיות המיקרו-שירות שמוגדרות ב-depvex.yaml וגם קיימות בפועל תחת root."""
         return [folder for folder in self.MICRO_SERVICE_FOLDERS if os.path.isdir(os.path.join(root, folder))]
 
     def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None):

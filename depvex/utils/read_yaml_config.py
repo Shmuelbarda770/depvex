@@ -18,7 +18,7 @@ def _find_yaml_upwards(start: Path) -> Path | None:
             if candidate.is_file():
                 return candidate
 
-        if current.parent == current:  # הגענו לשורש הדיסק
+        if current.parent == current:
             return None
 
         current = current.parent
