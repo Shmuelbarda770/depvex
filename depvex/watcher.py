@@ -78,7 +78,7 @@ class ProjectFileHandler(FileSystemEventHandler):
             )
 
     def on_modified(self, event: FileSystemEvent) -> None:
-        if event.is_directory or not event.src_path.endswith(".py"):
+        if event.is_directory or isinstance(event.src_path, bytes) or not event.src_path.endswith(".py"):
             return
 
         with self._lock:
@@ -87,7 +87,7 @@ class ProjectFileHandler(FileSystemEventHandler):
         self._schedule_run()
 
     def on_created(self, event: FileSystemEvent) -> None:
-        if event.is_directory or not event.src_path.endswith(".py"):
+        if event.is_directory or isinstance(event.src_path, bytes) or not event.src_path.endswith(".py"):
             return
 
         with self._lock:

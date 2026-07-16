@@ -29,7 +29,7 @@ class DepvexCLI:
     def _discover_imports(
         self, resolver: DependencyResolver, root: str, exclude_dirs: set[str] | None = None
     ) -> set[str]:
-        discovered = set()
+        discovered: set[str] = set()
         for file_path in resolver._walk_python_files(root, exclude_dirs=exclude_dirs):
             discovered.update(resolver._get_imports_for_file(file_path))
         return discovered

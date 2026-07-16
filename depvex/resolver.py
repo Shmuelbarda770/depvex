@@ -7,11 +7,16 @@ import subprocess
 import time
 import urllib.request
 from functools import lru_cache
+from collections.abc import Iterable, Iterator
+from typing import Any
 
+requests: Any | None = None
 try:
-    import requests  # type: ignore
+    import requests as requests_module  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - defensive fallback
-    requests = None
+    pass
+else:
+    requests = requests_module
 
 from depvex.parser import ImportExtractor  # ignore depvex
 from depvex.utils.read_config import project_config  # ignore depvex
@@ -126,7 +131,7 @@ class DependencyResolver:
         with open(path, "r", encoding="utf-8") as handle:
             return [line.strip() for line in handle if line.strip() and not line.strip().startswith("#")]
 
-    def write_req(self, lines, path: str = "requirements.txt") -> None:
+    def write_req(self, lines: Iterable[str], path: str = "requirements.txt") -> None:
         directory = os.path.dirname(path)
         if directory:
             os.makedirs(directory, exist_ok=True)
@@ -155,7 +160,7 @@ class DependencyResolver:
     def _get_active_service_folders(self, root: str) -> list[str]:
         return [folder for folder in self.MICRO_SERVICE_FOLDERS if os.path.isdir(os.path.join(root, folder))]
 
-    def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None):
+    def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None) -> Iterator[str]:
         exclude_dirs = exclude_dirs or set()
         base_skip = {".git", "__pycache__", ".venv", "venv", "node_modules"}
         root_abs = os.path.abspath(root)
@@ -181,7 +186,7 @@ class DependencyResolver:
         prune_stale: bool = True,
         exclude_dirs: set[str] | None = None,
     ) -> list[str]:
-        discovered = set()
+        discovered: set[str] = set()
 
         for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
             try:
@@ -255,12 +260,12 @@ class DependencyResolver:
         )
         return results
 
-    def monitor_project(self, module_list, interval: int = 2) -> None:
-        last_req = None
+    def monitor_project(self, module_list: Iterable[str], interval: int = 2) -> None:
+        last_req: list[str] | None = None
 
         while True:
             has_net = self.internet_check()
-            requirements = []
+            requirements: list[str] = []
 
             for module_name in module_list:
                 if self.is_installed(module_name):

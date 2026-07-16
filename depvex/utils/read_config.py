@@ -22,10 +22,11 @@ def _find_config_upwards(start: Path) -> Path | None:
 
 
 def read_config(file_path: str | None = None, start_dir: str | None = None) -> SimpleNamespace:
+    target_path: Path | None
     if file_path is not None:
         target_path = Path(file_path)
     else:
-        target_path: Path | None = _find_config_upwards(Path(start_dir or "."))
+        target_path = _find_config_upwards(Path(start_dir or "."))
 
     if target_path is None:
         print("[depvex] No config.json found in this directory or any parent directory. Using defaults.")
