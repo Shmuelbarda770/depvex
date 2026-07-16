@@ -66,10 +66,10 @@ Use this command when you want to manually create or update your `requirements.t
 **Command:**
 
 ```bash
-depvex scan .
+depvex --scan .
 ```
 
-*(You can replace `.` with any specific folder path, e.g., `depvex scan ./src`)*
+*(You can replace `.` with any specific folder path, e.g., `depvex --scan ./src`)*
 
 **What it does in detail:**
 
@@ -87,7 +87,7 @@ Use this command during active development so you never have to think about depe
 **Command:**
 
 ```bash
-depvex watch .
+depvex --watch .
 ```
 
 **What it does in detail:**
@@ -96,7 +96,7 @@ depvex watch .
 * Monitors your project files in real-time.
 * The moment you save, create, or delete a `.py` file, `depvex` instantly detects the change.
 * It silently re-runs the scanning process and updates `requirements.txt` on the fly.
-**Best Workflow:** Open a dedicated terminal tab, activate your virtual environment, run `depvex watch .`, and leave it running in the background while you write code in your IDE. To stop it, simply press `Ctrl+C`.
+**Best Workflow:** Open a dedicated terminal tab, activate your virtual environment, run `depvex --watch .`, and leave it running in the background while you write code in your IDE. To stop it, simply press `Ctrl+C`.
 
 ### 3. The `check` command: Verification (Great for CI/CD)
 
@@ -105,7 +105,7 @@ Use this command to verify that `requirements.txt` is up-to-date without actuall
 **Command:**
 
 ```bash
-depvex check .
+depvex --check .
 ```
 
 **What it does in detail:**
@@ -129,7 +129,7 @@ from pathlib import Path
 
 ```
 
-After running `depvex scan .`, `requirements.txt` may be updated to something like:
+After running `depvex --scan .`, `requirements.txt` may be updated to something like:
 
 ```txt
 requests==2.32.3
@@ -198,5 +198,5 @@ If you want to get started quickly, open your terminal and run:
 
 ```bash
 pip install depvex
-depvex watch .
+depvex --watch .
 ```

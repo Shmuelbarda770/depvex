@@ -91,7 +91,7 @@ This will also install the required dependencies, including:
 If you want to create or update requirements.txt once, run:
 
 ```bash
-depvex scan .
+depvex --scan .
 ```
 
 This performs a single pass over the project and writes the current dependency set into requirements.txt.
@@ -101,7 +101,7 @@ This performs a single pass over the project and writes the current dependency s
 If you want to verify whether the current requirements.txt matches the imports in your project, run:
 
 ```bash
-depvex check .
+depvex --check .
 ```
 
 This runs the same import scan and reports whether the dependency list is current.
@@ -111,7 +111,7 @@ This runs the same import scan and reports whether the dependency list is curren
 If you want depvex to keep updating requirements.txt while you work, run:
 
 ```bash
-depvex watch .
+depvex --watch .
 ```
 
 This will start watching your code for changes and update requirements.txt whenever a Python file changes.
@@ -119,9 +119,9 @@ This will start watching your code for changes and update requirements.txt whene
 ### Running against another path
 
 ```bash
-depvex scan ./my-project
-depvex check ./my-project
-depvex watch ./my-project
+depvex --scan ./my-project
+depvex --check ./my-project
+depvex --watch ./my-project
 ```
 
 ---
@@ -215,5 +215,5 @@ If you want to get started quickly, run:
 
 ```bash
 python3.11 -m pip install -e .
-depvex watch .
+depvex --watch .
 ```

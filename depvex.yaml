@@ -1,1 +1,4 @@
-micro_servi_folders: [serv, air, ground, share]
+ignore_dirs:
+  - test_project
+  - test
+

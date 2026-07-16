@@ -2,10 +2,10 @@ from pathlib import Path
 import argparse
 import sys
 
-from depvex.resolver import DependencyResolver
-from depvex.watcher import ProjectWatcher
+from depvex.resolver import DependencyResolver # ignore depvex
+from depvex.watcher import ProjectWatcher # ignore depvex
 
-from depvex.models.base_model import Colors
+from depvex.models.base_model import Colors # ignore depvex
 
 
 class DepvexCLI:
@@ -16,13 +16,13 @@ class DepvexCLI:
         parser = argparse.ArgumentParser(prog="depvex")
         subparsers = parser.add_subparsers(dest="command")
 
-        scan_parser = subparsers.add_parser("scan", help="Run a one-time dependency scan and update requirements.txt")
+        scan_parser = subparsers.add_parser("--scan", help="Run a one-time dependency scan and update requirements.txt")
         scan_parser.add_argument("path", nargs="?", default=".")
 
-        check_parser = subparsers.add_parser("check", help="Check whether requirements.txt is up to date")
+        check_parser = subparsers.add_parser("--check", help="Check whether requirements.txt is up to date")
         check_parser.add_argument("path", nargs="?", default=".")
 
-        watch_parser = subparsers.add_parser("watch", help="Watch project and auto-update requirements.txt")
+        watch_parser = subparsers.add_parser("--watch", help="Watch project and auto-update requirements.txt")
         watch_parser.add_argument("path", nargs="?", default=".")
         return parser
 

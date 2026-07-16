@@ -5,8 +5,8 @@ import time
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from depvex.resolver import DependencyResolver
-from depvex.utils.read_config import project_config
+from depvex.resolver import DependencyResolver # ignore depvex
+from depvex.utils.read_config import project_config # ignore depvex
 
 DEFAULT_DEBOUNCE_SECONDS = getattr(project_config, "debounce_seconds", 1.5)
 

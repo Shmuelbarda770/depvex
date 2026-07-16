@@ -20,7 +20,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install black mypy pylint isort pytest
+        pip install black mypy pylint isort pytest depvex
 
     - name: Format Python code with black (line length 120)
       run: |
@@ -38,7 +38,10 @@ jobs:
       run: |
          isort --profile black --line-length 120 --check-only --diff .
 
+    - name : Check for dependency updates with depvex
+      run: |
+         depvex --check
     # - name: Run pytest for unit tests
     #   run: |
-        # python -m pytest 
+        # python -m pytest
 

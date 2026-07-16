@@ -13,9 +13,9 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - defensive fallback
     requests = None
 
-from depvex.parser import ImportExtractor
-from depvex.utils.read_config import project_config
-from depvex.utils.read_yaml_config import read_yaml_config
+from depvex.parser import ImportExtractor # ignore depvex
+from depvex.utils.read_config import project_config # ignore depvex
+from depvex.utils.read_yaml_config import read_yaml_config # ignore depvex
 
 
 class DependencyResolver:
@@ -31,11 +31,18 @@ class DependencyResolver:
 
         yaml_config = read_yaml_config(start_dir=root)
         self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
+        self.IGNORE_DIRS: set[str] = set(getattr(yaml_config, "ignore_dirs", []))
 
         try:
             self.top_level_distributions = packages_distributions()
         except Exception:
             self.top_level_distributions = {}
+    def _is_ignored_dir(self, rel_path: str) -> bool:
+        if not self.IGNORE_DIRS:
+            return False
+        rel_path = rel_path.replace(os.sep, "/")
+        name = os.path.basename(rel_path)
+        return name in self.IGNORE_DIRS or rel_path in self.IGNORE_DIRS
 
     def internet_check(self, timeout: int = 3) -> bool:
         if requests is None:
@@ -158,10 +165,17 @@ class DependencyResolver:
         root_abs = os.path.abspath(root)
 
         for dirpath, dirnames, filenames in os.walk(root):
+            rel_dir = os.path.relpath(dirpath, root_abs)
+
             if os.path.abspath(dirpath) == root_abs:
                 dirnames[:] = [d for d in dirnames if d not in base_skip and d not in exclude_dirs]
             else:
                 dirnames[:] = [d for d in dirnames if d not in base_skip]
+
+            dirnames[:] = [
+                d for d in dirnames
+                if not self._is_ignored_dir(d if rel_dir == "." else f"{rel_dir}/{d}")
+            ]
 
             for filename in filenames:
                 if filename.endswith(".py") and not filename.startswith("."):
@@ -228,15 +242,6 @@ class DependencyResolver:
     def rebuild_requirements(
         self, root: str = ".", output_path: str | None = None, prune_stale: bool = True
     ) -> dict[str, list[str]] | list[str]:
-        """
-        בונה מחדש את requirements.txt לפרויקט ב-root.
-
-        אם micro_servi_folders מוגדר ב-depvex.yaml (מוגדר בזמן יצירת ה-resolver,
-        לפי הroot שהועבר לו) וקיימת בפועל לפחות תיקייה אחת מהרשימה תחת root,
-        כל תיקייה כזו נחשבת מיקרו-שירות עצמאי ומקבלת requirements.txt משלה.
-        כל מה שנשאר מחוץ לתיקיות השירות ממשיך לקובץ הגלובלי (root).
-        אם output_path נשלח במפורש - זו קריאה ל"קובץ יחיד" קלאסי, בלי פיצול.
-        """
         service_folders = self._get_active_service_folders(root)
 
         if not service_folders or output_path is not None:
