@@ -69,7 +69,7 @@ class DependencyResolver:
     @lru_cache(maxsize=256)
     def get_local_version(self, module_name: str) -> str | None:
         try:
-            result = subprocess.check_output(["pip", "show", module_name], text=True)
+            result = subprocess.check_output(["pip", "show", module_name], text=True, stderr=subprocess.DEVNULL)
             for line in result.splitlines():
                 if line.startswith("Version:"):
                     return line.split(":", 1)[1].strip()
