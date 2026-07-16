@@ -2,12 +2,11 @@ import importlib.util
 import json
 import os
 import re
-import subprocess
 import time
 import urllib.request
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
-from importlib.metadata import packages_distributions
+from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
 from typing import Any
 
 requests: Any | None = None
@@ -69,13 +68,9 @@ class DependencyResolver:
     @lru_cache(maxsize=256)
     def get_local_version(self, module_name: str) -> str | None:
         try:
-            result = subprocess.check_output(["pip", "show", module_name], text=True, stderr=subprocess.DEVNULL)
-            for line in result.splitlines():
-                if line.startswith("Version:"):
-                    return line.split(":", 1)[1].strip()
-        except subprocess.SubprocessError:
+            return distribution(module_name).version
+        except PackageNotFoundError:
             return None
-        return None
 
     @lru_cache(maxsize=256)
     def get_pypi_version(self, module_name: str) -> str | None:
