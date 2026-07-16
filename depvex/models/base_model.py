@@ -1,5 +1,6 @@
 import os
 
+
 class Colors:
     GREEN = "\033[92m"
     YELLOW = "\033[93m"

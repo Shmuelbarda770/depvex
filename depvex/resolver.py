@@ -1,30 +1,51 @@
 import importlib.util
-from importlib.metadata import packages_distributions
-import json
 import os
 import re
-import subprocess
 import time
-import urllib.request
+from collections.abc import Iterable, Iterator
 from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
+from typing import Any
 
+requests: Any | None = None
 try:
-    import requests  # type: ignore
+    import requests as requests_module  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - defensive fallback
-    requests = None
+    pass
+else:
+    requests = requests_module
 
-from depvex.parser import ImportExtractor
-from depvex.utils.read_config import project_config 
+from depvex.parser import ImportExtractor  # ignore depvex
+from depvex.utils.read_config import project_config  # ignore depvex
+from depvex.utils.read_yaml_config import read_yaml_config  # ignore depvex
+
 
 class DependencyResolver:
-    CAPTIVE_PORTAL_URLS: list[str] = project_config.CAPTIVE_PORTAL_URLS
+    CAPTIVE_PORTAL_URLS: list[str] = getattr(
+        project_config,
+        "CAPTIVE_PORTAL_URLS",
+        ["http://connectivitycheck.gstatic.com/generate_204"],
+    )
 
-    def __init__(self, parser: ImportExtractor | None = None) -> None:
+    def __init__(self, parser: ImportExtractor | None = None, root: str = ".") -> None:
         self.parser = parser or ImportExtractor()
+        self.root = root
+
+        yaml_config = read_yaml_config(start_dir=root)
+        self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
+        self.IGNORE_DIRS: set[str] = set(getattr(yaml_config, "ignore_dirs", []))
+
         try:
             self.top_level_distributions = packages_distributions()
         except Exception:
             self.top_level_distributions = {}
+
+    def _is_ignored_dir(self, rel_path: str) -> bool:
+        if not self.IGNORE_DIRS:
+            return False
+        rel_path = rel_path.replace(os.sep, "/")
+        name = os.path.basename(rel_path)
+        return name in self.IGNORE_DIRS or rel_path in self.IGNORE_DIRS
 
     def internet_check(self, timeout: int = 3) -> bool:
         if requests is None:
@@ -43,24 +64,24 @@ class DependencyResolver:
         return importlib.util.find_spec(module_name) is not None
 
     @lru_cache(maxsize=256)
-    def get_local_version(self, module_name: str)-> str | None:
+    def get_local_version(self, module_name: str) -> str | None:
         try:
-            result = subprocess.check_output(["pip", "show", module_name], text=True)
-            for line in result.splitlines():
-                if line.startswith("Version:"):
-                    return line.split(":", 1)[1].strip()
-        except subprocess.SubprocessError:
+            return distribution(module_name).version
+        except PackageNotFoundError:
             return None
-        return None
 
     @lru_cache(maxsize=256)
     def get_pypi_version(self, module_name: str) -> str | None:
+        if requests is None:
+            return None
+
         try:
             url = f"https://pypi.org/pypi/{module_name}/json"
-            with urllib.request.urlopen(url, timeout=3) as response:
-                data = json.load(response)
-            return data["info"]["version"]
-        except (OSError, KeyError, ValueError):
+            response = requests.get(url, timeout=3)
+            response.raise_for_status()
+            version = response.json()["info"]["version"]
+            return version if isinstance(version, str) else None
+        except (requests.RequestException, KeyError, TypeError, ValueError):
             return None
 
     def resolve(self, module_name: str, has_net: bool) -> str:
@@ -107,7 +128,11 @@ class DependencyResolver:
         with open(path, "r", encoding="utf-8") as handle:
             return [line.strip() for line in handle if line.strip() and not line.strip().startswith("#")]
 
-    def write_req(self, lines, path: str = "requirements.txt") -> None:
+    def write_req(self, lines: Iterable[str], path: str = "requirements.txt") -> None:
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+
         with open(path, "w", encoding="utf-8") as handle:
             for line in sorted(set(lines)):
                 handle.write(line + "\n")
@@ -117,7 +142,7 @@ class DependencyResolver:
             stat = os.stat(file_path)
             cache_key = (file_path, stat.st_mtime_ns)
             return self._get_imports_for_file_cached(cache_key)
-        except (OSError, SyntaxError):
+        except (OSError, SyntaxError, UnicodeDecodeError):
             return ()
 
     @lru_cache(maxsize=256)
@@ -126,30 +151,45 @@ class DependencyResolver:
         try:
             with open(file_path, "r", encoding="utf-8") as handle:
                 return tuple(self.parser.extract_imports(handle.read()))
-        except (OSError, SyntaxError):
+        except (OSError, SyntaxError, UnicodeDecodeError):
             return ()
 
-    def rebuild_requirements(
-        self, root: str = ".", output_path: str | None = None, prune_stale: bool = True
-    ) -> list[str]:
-        discovered = set()
+    def _get_active_service_folders(self, root: str) -> list[str]:
+        return [folder for folder in self.MICRO_SERVICE_FOLDERS if os.path.isdir(os.path.join(root, folder))]
+
+    def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None) -> Iterator[str]:
+        exclude_dirs = exclude_dirs or set()
+        base_skip = {".git", "__pycache__", ".venv", "venv", "node_modules"}
+        root_abs = os.path.abspath(root)
 
         for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [
-                directory
-                for directory in dirnames
-                if directory not in {".git", "__pycache__", ".venv", "venv", "node_modules"}
-            ]
+            rel_dir = os.path.relpath(dirpath, root_abs)
+
+            if os.path.abspath(dirpath) == root_abs:
+                dirnames[:] = [d for d in dirnames if d not in base_skip and d not in exclude_dirs]
+            else:
+                dirnames[:] = [d for d in dirnames if d not in base_skip]
+
+            dirnames[:] = [d for d in dirnames if not self._is_ignored_dir(d if rel_dir == "." else f"{rel_dir}/{d}")]
 
             for filename in filenames:
-                if not filename.endswith(".py"):
-                    continue
+                if filename.endswith(".py") and not filename.startswith("."):
+                    yield os.path.join(dirpath, filename)
 
-                file_path = os.path.join(dirpath, filename)
-                try:
-                    discovered.update(self._get_imports_for_file(file_path))
-                except (OSError, SyntaxError):
-                    continue
+    def _rebuild_single(
+        self,
+        root: str,
+        output_path: str | None = None,
+        prune_stale: bool = True,
+        exclude_dirs: set[str] | None = None,
+    ) -> list[str]:
+        discovered: set[str] = set()
+
+        for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
+            try:
+                discovered.update(self._get_imports_for_file(file_path))
+            except (OSError, SyntaxError, UnicodeDecodeError):
+                continue
 
         if output_path is None:
             output_path = os.path.join(root, "requirements.txt")
@@ -184,10 +224,6 @@ class DependencyResolver:
                 else:
                     requirements.append(self.resolve(module_name, has_net))
 
-            for existing_name in sorted(existing_by_name):
-                if existing_name not in current_normalized_names:
-                    continue
-
             self.write_req(requirements, path=output_path)
             return requirements
 
@@ -198,12 +234,35 @@ class DependencyResolver:
         self.write_req(requirements, path=output_path)
         return requirements
 
-    def monitor_project(self, module_list, interval: int = 2) -> None:
-        last_req = None
+    def rebuild_requirements(
+        self, root: str = ".", output_path: str | None = None, prune_stale: bool = True
+    ) -> dict[str, list[str]] | list[str]:
+        service_folders = self._get_active_service_folders(root)
+
+        if not service_folders or output_path is not None:
+            return self._rebuild_single(root, output_path, prune_stale)
+
+        results: dict[str, list[str]] = {}
+
+        for service in service_folders:
+            service_root = os.path.join(root, service)
+            service_output = os.path.join(service_root, "requirements.txt")
+            results[service] = self._rebuild_single(service_root, service_output, prune_stale)
+
+        results["__root__"] = self._rebuild_single(
+            root,
+            os.path.join(root, "requirements.txt"),
+            prune_stale,
+            exclude_dirs=set(service_folders),
+        )
+        return results
+
+    def monitor_project(self, module_list: Iterable[str], interval: int = 2) -> None:
+        last_req: list[str] | None = None
 
         while True:
             has_net = self.internet_check()
-            requirements = []
+            requirements: list[str] = []
 
             for module_name in module_list:
                 if self.is_installed(module_name):

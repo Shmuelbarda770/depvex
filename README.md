@@ -1,219 +1,201 @@
 # depvex
 
-Depvex is a small Python tool that helps manage a project's dependencies based on the imports used in its Python source code.
+`depvex` discovers third-party Python imports and maintains `requirements.txt`
+files from the source code that uses them. It is intended to make dependency
+files easier to review and keep current in both a single application and a
+repository containing several services.
 
-It performs three main tasks:
+## Goals
 
-1. Scans Python files in the project and detects third-party imports.
-2. Creates or updates the requirements.txt file based on the modules found.
-3. Watches the project for changes and re-runs the scan automatically.
+- Generate a clear dependency list from static Python imports.
+- Keep existing version pins when a dependency is still used.
+- Detect stale dependency files before merging a change.
+- Support one root application and independently deployable services in the
+  same repository.
+- Provide a watch mode for local development without requiring a shell command
+  for every edit.
 
----
+`depvex` is a dependency-file helper, not a lockfile or environment manager.
+For reproducible resolution across platforms, use it together with a tool such
+as pip-tools, Poetry, or uv.
 
 ## What it does
 
-This tool is especially useful when you want to generate requirements.txt quickly and accurately without writing it manually.
-
-It works like this:
-
-- Reads all .py files in the project
-- Extracts imports that are not part of the Python standard library
-- Tries to resolve each module into a requirements entry
-  - If the module is installed locally, it uses the locally installed version
-  - If it is not installed and the network is available, it checks the latest version on PyPI
-  - Otherwise, it writes just the module name without a version
-
----
-
-## Main features
-
-- Automatic detection of Python imports
-- Creation and updating of requirements.txt
-- Watch mode support for automatic re-scanning on file changes
-- Removes stale requirements entries when an import disappears from the project and is no longer used anywhere
-- Ignores directories such as .git, __pycache__, .venv, venv, and node_modules
-- Supports version resolution from local installs or PyPI
-
----
-
-## Project structure
-
-- cli.py – CLI entry point
-- parser.py – Extracts imports from Python code
-- resolver.py – Resolves modules into requirements entries
-- watcher.py – Watches files for changes
-
----
-
-## System requirements
-
-- Python 3.11
-- pip
-- Internet access (optional, only needed if you want to query PyPI for versions)
-
----
+- Parses `import` and `from ... import ...` statements with Python's AST.
+- Ignores modules from the Python standard library.
+- Skips imports annotated with `# ignore depvex`.
+- Recursively scans `.py` files, excluding `.git`, `__pycache__`, `.venv`,
+  `venv`, and `node_modules`.
+- Supports additional ignored directories through `depvex.yaml`.
+- Maps installed import modules to their distribution names when metadata is
+  available (for example, `yaml` to `PyYAML`).
+- Resolves a version from installed package metadata without launching `pip` or
+  another subprocess. If it is unavailable locally and internet access is
+  detected, it queries PyPI; otherwise it writes the package name without a
+  version.
+- Preserves an existing requirements entry when the same package is still
+  imported, and removes entries for imports that disappeared.
+- Watches created and modified Python files and debounces repeated events.
+- Uses colour only when the terminal supports it; set `NO_COLOR=1` to disable
+  colour explicitly.
 
 ## Installation
 
-### 1) Clone the project
+Requires Python 3.11 or newer.
 
 ```bash
-git clone <repository-url>
-cd depix
+python -m pip install -e .
 ```
 
-### 2) Create a virtual environment (recommended)
+YAML configuration is optional. Install PyYAML when using `depvex.yaml` or
+`depvex.yml`:
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
+python -m pip install PyYAML
 ```
 
-### 3) Install the project
+For a published release, install the package from PyPI instead of editable
+mode.
+
+## Commands
+
+The new CLI interface uses option-style commands:
 
 ```bash
-python3.11 -m pip install --upgrade pip
-python3.11 -m pip install -e .
+depvex --scan .
+depvex --check .
+depvex --watch .
 ```
 
-This will also install the required dependencies, including:
+| Command | Purpose | Result |
+| --- | --- | --- |
+| `depvex --scan [path]` | Scan once. | Creates or updates requirements files. |
+| `depvex --check [path]` | Verify scanned dependencies. | Returns `0` when current and `1` when a requirements file is missing or differs. |
+| `depvex --watch [path]` | Scan once, then watch the path. | Updates affected requirements files after the debounce delay. |
 
-- watchdog
-- requests
-- typer
+`path` defaults to the current directory.
 
----
+### Important current limitation
 
-## How to run it
+The parser registers the new option-style commands, but `depvex/cli.py` still
+dispatches the previous command names internally. Until that dispatch is
+updated, a command from the checked-out source can print the help text instead
+of running. The published older package uses positional commands such as
+`depvex check .`; that is a different interface. CI must install and execute
+one chosen version consistently.
 
-### One-time scan
+## Single-application repository
 
-If you want to create or update requirements.txt once, run:
+With no configured service folders, `depvex` scans the selected directory and
+writes one file:
+
+```text
+my-app/
+├── app.py
+└── requirements.txt
+```
+
+Run:
 
 ```bash
-depvex scan .
+depvex --scan my-app
 ```
 
-This performs a single pass over the project and writes the current dependency set into requirements.txt.
+## Microservices repository
 
-### Check mode
+Service support is enabled through `depvex.yaml` (or `depvex.yml`). The current
+configuration key is intentionally documented exactly as implemented:
+`micro_servi_folders`.
 
-If you want to verify whether the current requirements.txt matches the imports in your project, run:
+```yaml
+micro_servi_folders:
+  - api
+  - worker
 
-```bash
-depvex check .
+ignore_dirs:
+  - tests
+  - generated
 ```
 
-This runs the same import scan and reports whether the dependency list is current.
+Given this structure:
 
-### Watch mode
-
-If you want depvex to keep updating requirements.txt while you work, run:
-
-```bash
-depvex watch .
+```text
+platform/
+├── api/
+│   ├── main.py
+│   └── requirements.txt
+├── worker/
+│   ├── jobs.py
+│   └── requirements.txt
+├── shared_script.py
+└── requirements.txt
 ```
 
-This will start watching your code for changes and update requirements.txt whenever a Python file changes.
+`depvex --scan platform` scans `api` and `worker` separately, writes a
+`requirements.txt` inside each service, and writes a root
+`platform/requirements.txt` for Python files outside the named service
+folders. The root scan excludes those direct child service folders, avoiding
+duplication of service-only dependencies.
 
-### Running against another path
+In watch mode, a change under a named service rescans only that service; a
+change outside them rescans the root. Service folders must currently be direct
+children of the scanned root.
 
-```bash
-depvex scan ./my-project
-depvex check ./my-project
-depvex watch ./my-project
+### Configuration sources
+
+- `depvex.yaml` / `depvex.yml`: `ignore_dirs` and
+  `micro_servi_folders`.
+- `config.json` / `depvex.json`: `CAPTIVE_PORTAL_URLS` for the connectivity
+  check and `debounce_seconds` for watch mode.
+
+The JSON `micro_servi_folders` value is not currently read for service
+discovery; use YAML for that setting.
+
+## CI usage
+
+Install the project being checked and its declared dependencies before running
+the check. This supplies package metadata required for import-to-distribution
+mapping and ensures CI executes the checkout rather than an unrelated PyPI
+release.
+
+```yaml
+- name: Install project and dependencies
+  run: |
+    python -m pip install -r requirements.txt
+    python -m pip install .
+
+- name: Verify dependency files
+  run: depvex --check .
 ```
 
----
+At present, `check` compares its newly resolved entries with the file contents.
+Its output reports only that the file is out of date; it does not yet list the
+missing, stale, or changed entries. Use `scan`, inspect the resulting diff, and
+commit the intended requirements changes.
 
-## Example
+## Limitations
 
-Suppose you have a Python file like this:
+- Only static imports are detected; dynamic imports and dependencies loaded
+  from configuration are outside the analysis.
+- Import names and distribution names are not always identical. Accurate
+  mapping depends on installed distribution metadata.
+- The PyPI fallback needs network access and can reflect a newer version than
+  the one you intend to pin.
+- Syntax or decoding errors in a scanned Python file are skipped.
+- Watch mode currently reacts to creation and modification events, not every
+  possible filesystem operation.
 
-```python
-import requests
-import os
-from pathlib import Path
-```
+## Roadmap
 
-After running depvex, requirements.txt may be updated to something like:
+The next milestones are:
 
-```txt
-requests==2.32.3
-```
-
-The exact output depends on the locally installed version or the latest version available on PyPI.
-
----
-
-## How watch mode works
-
-In this mode:
-
-- The tool listens for changes in files ending in .py
-- When it detects a change, it re-scans the project
-- It regenerates requirements.txt
-
-This is especially useful during development when you add or remove imports frequently.
-
----
-
-## requirements.txt format
-
-The tool writes entries in the form:
-
-```txt
-package-name==1.2.3
-```
-
-or, if no version is found:
-
-```txt
-package-name
-```
-
-
----
-
-## Important notes
-
-- The tool is based on static analysis of imports, so it does not always detect dynamic imports perfectly.
-- If a module is not installed and the network is unavailable, it will write only the module name without a version.
-- This is a useful tool for generating an initial requirements.txt, but it is not a full replacement for dependency management tools such as poetry or uv in large projects.
-
----
-
-## Common issues
-
-### No depvex command found
-
-The most common cause is that the project was not installed with pip install -e .
-
-### requirements.txt is not updated
-
-Check whether:
-
-- the file you changed is a .py file
-- there is no syntax error in your code
-- you are running watch mode from the correct project root
-
-### No version is shown for a module
-
-This usually happens when:
-
-- the module is not installed locally
-- there is no internet access
-- PyPI did not return version information for the module
-
----
-
-## Summary
-
-Depvex is a simple and useful tool for generating requirements.txt automatically from Python source code, especially in fast-moving development environments.
-
-If you want to get started quickly, run:
-
-```bash
-python3.11 -m pip install -e .
-depvex watch .
-```
+1. Make command dispatch match the new `--scan`, `--check`, and `--watch`
+   interface.
+2. Use one shared calculation for scan and check so CI cannot fail merely
+   because dependency resolution happened in a different environment.
+3. Print an actionable check diff: missing, stale, and changed entries per
+   service.
+4. Make microservice configuration explicit and consistent, including a
+   correctly named `micro_service_folders` key and documented migration.
+5. Add automated coverage for single-project, microservice, watch, and CI
+   workflows.
