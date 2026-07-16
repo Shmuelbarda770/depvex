@@ -1,6 +1,8 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from depvex.cli import DepvexCLI
 from depvex.parser import ImportExtractor
 from depvex.resolver import DependencyResolver
@@ -52,7 +54,7 @@ def test_ignore_packages_excludes_a_dependency_from_requirements() -> None:
         assert resolver.requirements_for(tmpdir) == []
 
 
-def test_check_prints_stale_dependencies(monkeypatch, capsys) -> None:
+def test_check_prints_stale_dependencies(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         sample_file = Path(tmpdir) / "sample.py"
         sample_file.write_text("import requests\n", encoding="utf-8")
