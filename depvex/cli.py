@@ -13,16 +13,17 @@ class DepvexCLI:
 
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(prog="depvex")
-        subparsers = parser.add_subparsers(dest="command")
-
-        scan_parser = subparsers.add_parser("--scan", help="Run a one-time dependency scan and update requirements.txt")
-        scan_parser.add_argument("path", nargs="?", default=".")
-
-        check_parser = subparsers.add_parser("--check", help="Check whether requirements.txt is up to date")
-        check_parser.add_argument("path", nargs="?", default=".")
-
-        watch_parser = subparsers.add_parser("--watch", help="Watch project and auto-update requirements.txt")
-        watch_parser.add_argument("path", nargs="?", default=".")
+        commands = parser.add_mutually_exclusive_group(required=True)
+        commands.add_argument(
+            "--scan", action="store_const", const="scan", dest="command", help="Run a one-time dependency scan"
+        )
+        commands.add_argument(
+            "--check", action="store_const", const="check", dest="command", help="Check requirements.txt is up to date"
+        )
+        commands.add_argument(
+            "--watch", action="store_const", const="watch", dest="command", help="Watch and update requirements.txt"
+        )
+        parser.add_argument("path", nargs="?", default=".")
         return parser
 
     def _discover_imports(

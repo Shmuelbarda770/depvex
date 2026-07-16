@@ -75,14 +75,9 @@ depvex --watch .
 
 `path` defaults to the current directory.
 
-### Important current limitation
-
-The parser registers the new option-style commands, but `depvex/cli.py` still
-dispatches the previous command names internally. Until that dispatch is
-updated, a command from the checked-out source can print the help text instead
-of running. The published older package uses positional commands such as
-`depvex check .`; that is a different interface. CI must install and execute
-one chosen version consistently.
+The option-style interface is intentionally incompatible with older published
+releases that use positional commands such as `depvex check .`. CI must install
+and execute one chosen version consistently.
 
 ## Single-application repository
 
@@ -189,13 +184,11 @@ commit the intended requirements changes.
 
 The next milestones are:
 
-1. Make command dispatch match the new `--scan`, `--check`, and `--watch`
-   interface.
-2. Use one shared calculation for scan and check so CI cannot fail merely
+1. Use one shared calculation for scan and check so CI cannot fail merely
    because dependency resolution happened in a different environment.
-3. Print an actionable check diff: missing, stale, and changed entries per
+2. Print an actionable check diff: missing, stale, and changed entries per
    service.
-4. Make microservice configuration explicit and consistent, including a
+3. Make microservice configuration explicit and consistent, including a
    correctly named `micro_service_folders` key and documented migration.
-5. Add automated coverage for single-project, microservice, watch, and CI
+4. Add automated coverage for single-project, microservice, watch, and CI
    workflows.

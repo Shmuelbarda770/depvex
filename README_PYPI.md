@@ -49,11 +49,9 @@ depvex --watch .
 
 ### Version note
 
-The new source interface above is not compatible with the older published
-package, which uses positional commands such as `depvex check .`. The current
-source also needs its command dispatcher aligned with the new option-style
-names before those commands can execute correctly. Install and invoke one
-version consistently in CI.
+The new source interface above is not compatible with older published
+releases, which use positional commands such as `depvex check .`. Install and
+invoke one version consistently in CI.
 
 ## Single application
 
