@@ -1,20 +1,20 @@
 """
-שולף את top_level.txt מתוך wheel files ב-PyPI בלי להוריד את כל ה-wheel
-ובלי לעשות unzip - שולף רק את הבייטים הרלוונטיים דרך HTTP Range requests.
+Extract top_level.txt from wheel files on PyPI without downloading the full wheel
+and without unzipping - fetches only the relevant bytes via HTTP Range requests.
 
-איך זה עובד:
-1. PyPI JSON API -> מוצא את ה-URL של ה-wheel האחרון של החבילה
-2. Range request על הסוף של הקובץ -> מוצא את ה-EOCD (End Of Central Directory)
-3. Range request על ה-Central Directory -> מוצא את המיקום של top_level.txt
-4. Range request רק על הבייטים של top_level.txt -> מפענח (deflate/store)
+How it works:
+1. PyPI JSON API -> finds the URL of the latest wheel for the package
+2. Range request on the end of the file -> finds the EOCD (End Of Central Directory)
+3. Range request on the Central Directory -> finds the location of top_level.txt
+4. Range request only for the bytes of top_level.txt -> decompresses (deflate/store)
 
-תלוי בזה שהשרת (Fastly CDN של PyPI) תומך ב-Range requests - והוא כן תומך.
+This depends on the server (PyPI Fastly CDN) supporting Range requests - which it does.
 
-קלט: pypi_packages.txt (שם חבילה בכל שורה)
-פלט:
-  - top_level_results.jsonl -> תוצאות מלאות, שורה אחת לכל חבילה (resume-able)
-  - import_map.txt          -> מיפוי שטוח, שורה לכל import name: "import_name:package_name"
-                               לדוגמה: cv2:opencv-python
+Input: pypi_packages.txt (one package name per line)
+Output:
+  - top_level_results.jsonl -> full results, one line per package (resume-able)
+  - import_map.txt          -> flat mapping, one line per import name: "import_name:package_name"
+                               for example: cv2:opencv-python
 """
 
 import json
@@ -31,7 +31,7 @@ INPUT_FILE = "pypi_packages.txt"
 OUTPUT_FILE = "top_level_results.jsonl"
 MAP_FILE = "import_map.txt"
 MAX_WORKERS = 20
-TAIL_SIZE = 65536          # 64KB בדרך כלל מספיק כדי לתפוס את ה-EOCD + comment
+TAIL_SIZE = 65536          # 64KB is usually enough to capture the EOCD + comment
 REQUEST_TIMEOUT = 30
 
 write_lock = Lock()
@@ -39,7 +39,7 @@ session = requests.Session()
 
 
 def get_wheel_url(package_name):
-    """מחזיר (url, size) של ה-wheel העדכני ביותר של החבילה, או (None, None)"""
+    """Return (url, size) for the latest wheel of the package, or (None, None)"""
     r = session.get(f"https://pypi.org/pypi/{package_name}/json", timeout=15)
     r.raise_for_status()
     data = r.json()
@@ -58,13 +58,13 @@ def fetch_range(url, start, end):
     r = session.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
     r.raise_for_status()
     if r.status_code != 206:
-        # השרת לא תמך ב-Range וחזר 200 עם כל הקובץ - תרחיש נדיר
+        # The server did not support Range and returned the full file instead - rare case
         raise RuntimeError("Server did not honor Range request (no 206)")
     return r.content
 
 
 def get_central_directory(url, total_size):
-    """מביא רק את הזנב של הקובץ, מוצא EOCD, ואז מביא את ה-Central Directory"""
+    """Fetch only the tail of the file, find the EOCD, then fetch the Central Directory"""
     tail_size = min(TAIL_SIZE, total_size)
     tail = fetch_range(url, total_size - tail_size, total_size - 1)
 
@@ -80,7 +80,7 @@ def get_central_directory(url, total_size):
 
 
 def find_entries(cd_data, suffix="top_level.txt"):
-    """פרסור ידני של ה-Central Directory, מחזיר רשומות שמסתיימות ב-suffix"""
+    """Manual parse of the Central Directory, returns entries ending with the suffix"""
     offset = 0
     results = []
     while offset + 46 <= len(cd_data):
@@ -100,7 +100,7 @@ def find_entries(cd_data, suffix="top_level.txt"):
 
 
 def read_entry_data(url, local_offset, comp_size, method):
-    """מביא local file header כדי לדעת את גודל השם/extra, ואז מביא רק את הדאטה"""
+    """Fetch the local file header to obtain name/extra lengths, then fetch only the file data"""
     header = fetch_range(url, local_offset, local_offset + 29)
     (_, _, _, _, _, _, _, _, _, name_len, extra_len) = struct.unpack("<IHHHHHIIIHH", header)
 

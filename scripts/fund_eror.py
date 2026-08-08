@@ -12,7 +12,7 @@
 # OUTPUT_FILE = "top_level_results.jsonl"
 # MAP_FILE = "fix_mapping_eeroes.txt"
 # MAX_WORKERS = 20
-# TAIL_SIZE = 65536          # 64KB בדרך כלל מספיק כדי לתפוס את ה-EOCD + comment
+# TAIL_SIZE = 65536          # 64KB is usually enough to capture the EOCD + comment
 # REQUEST_TIMEOUT = 30
 
 # write_lock = Lock()
@@ -20,7 +20,7 @@
 
 
 # def get_wheel_url(package_name):
-#     """מחזיר (url, size) של ה-wheel העדכני ביותר של החבילה, או (None, None)"""
+#     """Return (url, size) of the latest wheel for the package, or (None, None)"""
 #     r = session.get(f"https://pypi.org/pypi/{package_name}/json", timeout=15)
 #     r.raise_for_status()
 #     data = r.json()
@@ -39,13 +39,13 @@
 #     r = session.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
 #     r.raise_for_status()
 #     if r.status_code != 206:
-#         # השרת לא תמך ב-Range וחזר 200 עם כל הקובץ - תרחיש נדיר
+#         # The server did not support Range and returned the full file instead - rare case
 #         raise RuntimeError("Server did not honor Range request (no 206)")
 #     return r.content
 
 
 # def get_central_directory(url, total_size):
-#     """מביא רק את הזנב של הקובץ, מוצא EOCD, ואז מביא את ה-Central Directory"""
+#     """Fetch only the tail of the file, find the EOCD, then fetch the Central Directory"""
 #     tail_size = min(TAIL_SIZE, total_size)
 #     tail = fetch_range(url, total_size - tail_size, total_size - 1)
 
@@ -61,7 +61,7 @@
 
 
 # def find_entries(cd_data, suffix="top_level.txt"):
-#     """פרסור ידני של ה-Central Directory, מחזיר רשומות שמסתיימות ב-suffix"""
+#     """Manual parse of the Central Directory, returns entries ending with the suffix"""
 #     offset = 0
 #     results = []
 #     while offset + 46 <= len(cd_data):
@@ -82,10 +82,10 @@
 
 # def infer_top_level_from_wheel_filenames(cd_data):
 #     """
-#     Fallback לwheels שלא כוללים top_level.txt (נפוץ מאוד ב-wheels חדשים).
-#     לא דורש שום בקשת רשת נוספת - כבר יש לנו את ה-Central Directory בזיכרון.
-#     מסיק את שמות ה-import לפי הסגמנט הראשון בנתיב של כל קובץ, תוך התעלמות
-#     מתיקיות מטא-דאטה (*.dist-info, *.data).
+#     Fallback for wheels that do not include top_level.txt (very common for newer wheels).
+#     No additional network request is required - we already have the Central Directory in memory.
+#     Infers import names from the first path segment of each file, ignoring
+#     metadata directories (*.dist-info, *.data).
 #     """
 #     offset = 0
 #     top_level = set()
@@ -101,9 +101,9 @@
 #         first_segment = name.split("/", 1)[0]
 #         if not any(first_segment.endswith(suf) for suf in SKIP_SUFFIXES):
 #             if "/" in name:
-#                 top_level.add(first_segment)          # תיקיית חבילה
+#                 top_level.add(first_segment)          # package folder
 #             elif name.endswith(".py") and first_segment != "setup.py":
-#                 top_level.add(first_segment[:-3])      # מודול בודד בשורש
+#                 top_level.add(first_segment[:-3])      # single module at root
 
 #         offset += 46 + name_len + extra_len + comment_len
 
@@ -111,7 +111,7 @@
 
 
 # def get_sdist_url(package_name, package_json=None):
-#     """מחזיר URL של ה-sdist (tar.gz) העדכני, אם קיים"""
+#     """Return the sdist (tar.gz) URL if available"""
 #     data = package_json
 #     if data is None:
 #         r = session.get(f"https://pypi.org/pypi/{package_name}/json", timeout=15)
@@ -128,10 +128,10 @@
 
 # def infer_top_level_from_sdist(url):
 #     """
-#     Fallback לחבילות בלי wheel כלל - יש רק sdist.
-#     tar.gz אין לו Central Directory כמו ל-zip, אז אי אפשר לעשות range-request
-#     לפי אינדקס - חייבים לזרום דרך כל הקובץ. עדיין לא כותבים כלום לדיסק,
-#     הכל נקרא ומפורש ב-memory תוך כדי streaming.
+#     Fallback for packages without any wheel - only sdist is available.
+#     tar.gz does not have a Central Directory like zip, so range requests by index are impossible
+#     and the file must be streamed fully. Nothing is written to disk yet,
+#     everything is read and parsed in memory while streaming.
 #     """
 #     import tarfile
 
@@ -146,7 +146,7 @@
 #             parts = member.name.split("/")
 #             if len(parts) < 2:
 #                 continue
-#             candidate = parts[1]  # parts[0] הוא תיקיית השורש (pkgname-version)
+#             candidate = parts[1]  # parts[0] is the root directory (pkgname-version)
 
 #             if candidate.endswith(".egg-info") or candidate in SKIP_DIRS or not candidate:
 #                 continue
@@ -160,7 +160,7 @@
 
 
 # def read_entry_data(url, local_offset, comp_size, method):
-#     """מביא local file header כדי לדעת את גודל השם/extra, ואז מביא רק את הדאטה"""
+#     """Fetch the local file header to obtain name/extra lengths, then fetch only the file data"""
 #     header = fetch_range(url, local_offset, local_offset + 29)
 #     (_, _, _, _, _, _, _, _, _, name_len, extra_len) = struct.unpack("<IHHHHHIIIHH", header)
 
@@ -191,13 +191,13 @@
 #                 if top_level:
 #                     return {"package": name, "top_level": top_level, "source": "top_level.txt"}
 
-#             # fallback 1: אין top_level.txt - נסיק מרשימת הקבצים של אותו wheel
-#             # (בלי בקשת רשת נוספת - cd_data כבר בזיכרון)
+#             # fallback 1: no top_level.txt - infer from the wheel file listing
+#             # (no extra network request - cd_data is already in memory)
 #             top_level = infer_top_level_from_wheel_filenames(cd_data)
 #             if top_level:
 #                 return {"package": name, "top_level": top_level, "source": "wheel_filenames"}
 
-#         # fallback 2: אין wheel בכלל (או שה-wheel לא הניב כלום) - ננסה sdist
+#         # fallback 2: no wheel available (or the wheel yielded nothing) - try sdist
 #         sdist_url = get_sdist_url(name)
 #         if sdist_url:
 #             top_level = infer_top_level_from_sdist(sdist_url)
@@ -211,8 +211,8 @@
 
 # def load_done(output_path):
 #     """
-#     חבילה נחשבת 'גמורה' רק אם היא הצליחה. חבילות עם error יישארו ב-todo
-#     ויתנסו שוב (רלוונטי כי הוספנו fallbacks חדשים שיכולים להצליח הפעם).
+#     A package is considered 'complete' only if it succeeded. packages with errors remain in todo
+#     and may retry later (relevant because we added new fallbacks that can succeed on retry).
 #     """
 #     done = set()
 #     if Path(output_path).exists():
@@ -229,8 +229,8 @@
 
 # def dedupe_output_file(path):
 #     """
-#     אחרי retry יכולות להיות כמה שורות לאותה חבילה (למשל שורת error ישנה +
-#     שורת success חדשה). משאיר רק את המופע האחרון של כל חבילה.
+#     After retry there may be multiple rows for the same package (for example an old error row +
+#     a new success row). Keep only the last occurrence for each package.
 #     """
 #     if not Path(path).exists():
 #         return
@@ -301,36 +301,3 @@
 
 # if __name__ == "__main__":
 #     main()
-count = 0
-total = 0
-different = []
-
-with open("import_map.txt", "r", encoding="utf-8") as f:
-    for line in f:
-        line = line.strip()
-
-        if not line or ":" not in line:
-            continue
-
-        left, right = line.split(":", 1)
-
-        left = left.strip().lower()
-        right = right.strip().lower()
-
-        total += 1
-
-        # נרמול: - ו _ נחשבים אותו דבר
-        left_norm = left.replace("-", "_")
-        right_norm = right.replace("-", "_")
-
-        if left_norm != right_norm:
-            count += 1
-            different.append((left, right))
-
-
-print(f"סה״כ חבילות: {total}")
-print(f"לא תואמות: {count}")
-
-print("\nדוגמאות:")
-for item in different[:20]:
-    print(item[0], "->", item[1])

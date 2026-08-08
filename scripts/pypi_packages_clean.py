@@ -31,7 +31,7 @@ def build_session() -> requests.Session:
 
 
 def load_done(path: str) -> set[str]:
-    """טוען חבילות שכבר נבדקו בהצלחה, לצורך המשך ריצה."""
+    """Load packages already checked successfully for resuming a run."""
     try:
         with open(path, "r", encoding="utf-8") as f:
             return {line.strip() for line in f if line.strip()}
@@ -55,18 +55,18 @@ def main():
     already_done = load_done(OUTPUT_FILE)
     to_check = [p for p in packages if p not in already_done]
 
-    print(f"סה\"כ חבילות בקובץ: {len(packages)}")
-    print(f"כבר נבדקו בעבר: {len(already_done)}")
-    print(f"נותרו לבדיקה: {len(to_check)}")
+    print(f"Total packages in file: {len(packages)}")
+    print(f"Already checked: {len(already_done)}")
+    print(f"Remaining to check: {len(to_check)}")
 
     if not to_check:
-        print("אין מה לבדוק, הכל כבר קיים בקובץ הפלט.")
+        print("Nothing to check, everything is already in the output file.")
         return
 
     session = build_session()
     found_count = 0
 
-    # פתיחת קובץ הפלט במצב append כדי לא לאבד תוצאות אם הריצה נקטעת
+    # Open the output file in append mode to avoid losing results if the run is interrupted
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor, \
          open(OUTPUT_FILE, "a", encoding="utf-8") as out:
 
@@ -85,11 +85,11 @@ def main():
                     out.flush()
 
             if i % 1000 == 0:
-                print(f"נבדקו {i}/{len(to_check)} (נמצאו עד כה: {found_count})")
+                print(f"Checked {i}/{len(to_check)} (found so far: {found_count})")
 
     print()
-    print(f"נמצאו {found_count} חבילות תקינות בריצה הזו")
-    print(f"נשמר לקובץ: {OUTPUT_FILE}")
+    print(f"Found {found_count} valid packages in this run")
+    print(f"Saved to file: {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

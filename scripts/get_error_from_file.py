@@ -24,7 +24,7 @@ def extract_errors():
         for error in errors:
             f.write(error + "\n")
 
-    print(f"נשמרו {len(errors)} שגיאות לתוך {OUTPUT_FILE}")
+    print(f"Saved {len(errors)} errors to {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

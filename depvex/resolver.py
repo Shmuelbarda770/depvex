@@ -3,6 +3,7 @@ import os
 import re
 import time
 import tomllib
+from pathlib import Path
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
@@ -15,6 +16,8 @@ except ModuleNotFoundError:  # pragma: no cover - defensive fallback
     pass
 else:
     requests = requests_module
+
+IMPORT_MAPPING_FILE = Path(__file__).resolve().parents[1] / "import_mapping_filtered.txt"
 
 from depvex.parser import ImportExtractor  # ignore depvex
 from depvex.utils.read_config import project_config  # ignore depvex
@@ -45,6 +48,8 @@ class DependencyResolver:
             self.top_level_distributions = packages_distributions()
         except Exception:
             self.top_level_distributions = {}
+
+        self.IMPORT_MAPPING = self._load_import_mapping_file()
 
     def _is_ignored_dir(self, rel_path: str) -> bool:
         if not self.IGNORE_DIRS:
@@ -96,9 +101,16 @@ class DependencyResolver:
             return None
 
     def resolve(self, module_name: str, has_net: bool) -> str:
-        package_name = self._module_to_package_name(module_name)
-        version = self.get_local_version(package_name)
+        normalized_module = self._normalize_module_name(module_name)
+        if not normalized_module:
+            return ""
 
+        if self.is_installed(normalized_module):
+            package_name = self._module_to_package_name(normalized_module)
+        else:
+            package_name = self._mapped_package_name(normalized_module) or self._module_to_package_name(normalized_module)
+
+        version = self.get_local_version(package_name)
         if version:
             return f"{package_name}=={version}"
 
@@ -119,6 +131,10 @@ class DependencyResolver:
         if candidate:
             return candidate[0]
 
+        mapped = self._mapped_package_name(normalized)
+        if mapped:
+            return mapped
+
         return normalized
 
     def _normalize_module_name(self, module_name: str) -> str:
@@ -131,6 +147,48 @@ class DependencyResolver:
         if not match:
             return ""
         return match.group(1).lower()
+
+    def _load_import_mapping_file(self) -> dict[str, list[str]]:
+        mapping: dict[str, list[str]] = {}
+        if not IMPORT_MAPPING_FILE.is_file():
+            return mapping
+
+        try:
+            with IMPORT_MAPPING_FILE.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+
+                    parts = line.split(":", 1)
+                    if len(parts) != 2:
+                        continue
+
+                    module_name = self._normalize_module_name(parts[0])
+                    package_name = self._normalize_module_name(parts[1])
+                    if module_name and package_name:
+                        mapping.setdefault(module_name, []).append(package_name)
+        except (OSError, UnicodeDecodeError):
+            pass
+
+        return mapping
+
+    def _mapped_package_name(self, module_name: str) -> str | None:
+        normalized = self._normalize_module_name(module_name)
+        if not normalized:
+            return None
+
+        candidates = self.IMPORT_MAPPING.get(normalized)
+        if not candidates:
+            return None
+
+        if len(candidates) == 1:
+            return candidates[0]
+
+        for candidate in candidates:
+            if candidate == normalized:
+                return candidate
+        return candidates[0]
 
     def _read_existing_requirements(self, path: str) -> list[str]:
         if not os.path.exists(path):

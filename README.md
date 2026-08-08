@@ -31,6 +31,9 @@ as pip-tools, Poetry, or uv.
   resolved distribution name.
 - Maps installed import modules to their distribution names when metadata is
   available (for example, `yaml` to `PyYAML`).
+- Uses `import_mapping_filtered.txt` as a fallback when an import is not
+  installed locally, mapping it to a known distribution before optionally
+  querying PyPI.
 - Resolves a version from installed package metadata without launching `pip` or
   another subprocess. If it is unavailable locally and internet access is
   detected, it queries PyPI; otherwise it writes the package name without a
@@ -193,7 +196,10 @@ reviewed source of truth.
 - Only static imports are detected; dynamic imports and dependencies loaded
   from configuration are outside the analysis.
 - Import names and distribution names are not always identical. Accurate
-  mapping depends on installed distribution metadata.
+  mapping depends on installed distribution metadata or a maintained import
+  mapping fallback.
+- The `import_mapping_filtered.txt` fallback is continuously refined; keep it
+  updated with new mappings for best results.
 - The PyPI fallback needs network access and can reflect a newer version than
   the one you intend to pin.
 - Syntax or decoding errors in a scanned Python file are skipped.

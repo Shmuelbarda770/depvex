@@ -54,6 +54,22 @@ def test_ignore_packages_excludes_a_dependency_from_requirements() -> None:
         assert resolver.requirements_for(tmpdir) == []
 
 
+def test_resolver_uses_import_mapping_when_module_is_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sample_file = Path(tmpdir) / "sample.py"
+        sample_file.write_text("import yaml\n", encoding="utf-8")
+
+        resolver = DependencyResolver(root=tmpdir)
+        resolver.IMPORT_MAPPING = {"yaml": ["pyyaml"]}
+        monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+        monkeypatch.setattr(DependencyResolver, "is_installed", lambda self, module_name: False)
+        monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+        requirements = resolver.requirements_for(tmpdir)
+
+        assert requirements == ["pyyaml"]
+
+
 def test_check_prints_stale_dependencies(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         sample_file = Path(tmpdir) / "sample.py"
