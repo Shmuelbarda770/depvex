@@ -1,4 +1,5 @@
 PyYAML==6.0.3
 pytest==9.1.1
 requests==2.34.2
+urllib3-future==2.24.900
 watchdog==6.0.0
