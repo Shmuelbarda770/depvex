@@ -13,9 +13,7 @@ def extract_errors():
                 data = json.loads(line)
 
                 if "error" in data:
-                    errors.append(
-                        f"{data['package']} | {data['error']}"
-                    )
+                    errors.append(f"{data['package']} | {data['error']}")
 
             except json.JSONDecodeError:
                 continue

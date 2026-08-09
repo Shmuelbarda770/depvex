@@ -1,8 +1,9 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
 
 INPUT_FILE = "pypi_packages.txt"
 OUTPUT_FILE = "pypi_packages_clean.txt"
@@ -67,13 +68,9 @@ def main():
     found_count = 0
 
     # Open the output file in append mode to avoid losing results if the run is interrupted
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor, \
-         open(OUTPUT_FILE, "a", encoding="utf-8") as out:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor, open(OUTPUT_FILE, "a", encoding="utf-8") as out:
 
-        futures = {
-            executor.submit(check_package, session, pkg): pkg
-            for pkg in to_check
-        }
+        futures = {executor.submit(check_package, session, pkg): pkg for pkg in to_check}
 
         for i, future in enumerate(as_completed(futures), 1):
             result = future.result()

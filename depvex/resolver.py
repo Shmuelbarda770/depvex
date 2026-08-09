@@ -3,14 +3,14 @@ import os
 import re
 import time
 import tomllib
-
-from pathlib import Path
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
-from packaging.version import Version
-from packaging.specifiers import SpecifierSet
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
+from pathlib import Path
 from typing import Any
+
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 
 requests: Any | None = None
 try:
@@ -176,6 +176,7 @@ class DependencyResolver:
                 return mapped
 
         return normalized
+
     def find_compatible_version(self, package: str, python_version: str):
         url = f"https://pypi.org/pypi/{package}/json"
 

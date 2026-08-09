@@ -56,10 +56,7 @@ def get_existing_packages(filename="import_mapping.txt"):
     return packages
 
 
-def save_missing_packages(
-    filename="missing_popular_packages.txt",
-    packages=None
-):
+def save_missing_packages(filename="missing_popular_packages.txt", packages=None):
     with open(filename, "w", encoding="utf-8") as f:
         for package in packages:
             f.write(package + "\n")
@@ -67,9 +64,7 @@ def save_missing_packages(
 
 top_packages = get_top_pypi_packages(15000)
 
-existing_packages = get_existing_packages(
-    "import_mapping.txt"
-)
+existing_packages = get_existing_packages("import_mapping.txt")
 
 missing = []
 
@@ -78,10 +73,7 @@ for package in top_packages:
         missing.append(package)
 
 
-save_missing_packages(
-    "missing_popular_packages.txt",
-    missing
-)
+save_missing_packages("missing_popular_packages.txt", missing)
 
 print(f"Top packages checked: {len(top_packages)}")
 print(f"Missing packages: {len(missing)}")

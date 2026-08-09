@@ -1,8 +1,9 @@
 import tempfile
 from pathlib import Path
 
-import pytest 
-import depvex.resolver as resolver_module # ignore depvex
+import pytest
+
+import depvex.resolver as resolver_module  # ignore depvex
 from depvex.cli import DepvexCLI  # ignore depvex
 from depvex.parser import ImportExtractor  # ignore depvex
 from depvex.resolver import DependencyResolver  # ignore depvex

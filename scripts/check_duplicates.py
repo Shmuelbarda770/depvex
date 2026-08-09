@@ -1,14 +1,9 @@
 from collections import defaultdict
 from pathlib import Path
 
+INPUT_FILE = Path("/Users/shmuelbarda/Desktop/depvex/import_mapping_filtered.txt")
 
-INPUT_FILE = Path(
-    "/Users/shmuelbarda/Desktop/depvex/import_mapping_filtered.txt"
-)
-
-OUTPUT_FILE = Path(
-    "/Users/shmuelbarda/Desktop/depvex/duplicate_imports.txt"
-)
+OUTPUT_FILE = Path("/Users/shmuelbarda/Desktop/depvex/duplicate_imports.txt")
 
 
 imports = defaultdict(set)
@@ -29,11 +24,7 @@ with INPUT_FILE.open("r", encoding="utf-8") as f:
             imports[import_name].add(package_name)
 
 
-duplicates = {
-    import_name: sorted(packages)
-    for import_name, packages in imports.items()
-    if len(packages) > 1
-}
+duplicates = {import_name: sorted(packages) for import_name, packages in imports.items() if len(packages) > 1}
 
 
 with OUTPUT_FILE.open("w", encoding="utf-8") as f:

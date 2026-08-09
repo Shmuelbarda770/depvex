@@ -21,9 +21,9 @@ import json
 import struct
 import time
 import zlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Lock
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -31,7 +31,7 @@ INPUT_FILE = "pypi_packages.txt"
 OUTPUT_FILE = "top_level_results.jsonl"
 MAP_FILE = "import_map.txt"
 MAX_WORKERS = 20
-TAIL_SIZE = 65536          # 64KB is usually enough to capture the EOCD + comment
+TAIL_SIZE = 65536  # 64KB is usually enough to capture the EOCD + comment
 REQUEST_TIMEOUT = 30
 
 write_lock = Lock()
@@ -72,8 +72,8 @@ def get_central_directory(url, total_size):
     if idx == -1:
         raise ValueError("EOCD signature not found - comment section too large?")
 
-    eocd = tail[idx:idx + 22]
-    (_, _, _, _, _, cd_size, cd_offset, _) = struct.unpack("<IHHHHIIH", eocd)
+    eocd = tail[idx : idx + 22]
+    _, _, _, _, _, cd_size, cd_offset, _ = struct.unpack("<IHHHHIIH", eocd)
 
     cd_data = fetch_range(url, cd_offset, cd_offset + cd_size - 1)
     return cd_data
@@ -84,14 +84,12 @@ def find_entries(cd_data, suffix="top_level.txt"):
     offset = 0
     results = []
     while offset + 46 <= len(cd_data):
-        if cd_data[offset:offset + 4] != b"PK\x01\x02":
+        if cd_data[offset : offset + 4] != b"PK\x01\x02":
             break
-        fields = struct.unpack("<HHHHHHIIIHHHHHII", cd_data[offset + 4:offset + 46])
-        (_, _, _, method, _, _, _,
-         comp_size, _, name_len, extra_len, comment_len,
-         _, _, _, local_offset) = fields
+        fields = struct.unpack("<HHHHHHIIIHHHHHII", cd_data[offset + 4 : offset + 46])
+        _, _, _, method, _, _, _, comp_size, _, name_len, extra_len, comment_len, _, _, _, local_offset = fields
 
-        name = cd_data[offset + 46:offset + 46 + name_len].decode("utf-8", "replace")
+        name = cd_data[offset + 46 : offset + 46 + name_len].decode("utf-8", "replace")
         if name.endswith(suffix):
             results.append((name, local_offset, comp_size, method))
 
@@ -102,7 +100,7 @@ def find_entries(cd_data, suffix="top_level.txt"):
 def read_entry_data(url, local_offset, comp_size, method):
     """Fetch the local file header to obtain name/extra lengths, then fetch only the file data"""
     header = fetch_range(url, local_offset, local_offset + 29)
-    (_, _, _, _, _, _, _, _, _, name_len, extra_len) = struct.unpack("<IHHHHHIIIHH", header)
+    _, _, _, _, _, _, _, _, _, name_len, extra_len = struct.unpack("<IHHHHHIIIHH", header)
 
     data_start = local_offset + 30 + name_len + extra_len
     data = fetch_range(url, data_start, data_start + comp_size - 1)
@@ -159,8 +157,7 @@ def main():
     fail_count = 0
     start_time = time.monotonic()
 
-    with open(OUTPUT_FILE, "a", encoding="utf-8") as out, \
-         open(MAP_FILE, "a", encoding="utf-8") as map_out:
+    with open(OUTPUT_FILE, "a", encoding="utf-8") as out, open(MAP_FILE, "a", encoding="utf-8") as map_out:
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
             futures = {ex.submit(process_package, p): p for p in todo}
             for i, fut in enumerate(as_completed(futures), 1):
@@ -190,9 +187,11 @@ def main():
                     )
 
     print(f"\ndone. success: {success_count} | fail: {fail_count}")
-    print(f"note: {MAP_FILE} may contain duplicate import names across packages "
-          f"(e.g. two packages both exporting the same top-level name). "
-          f"dedupe manually if you need a strict 1:1 mapping.")
+    print(
+        f"note: {MAP_FILE} may contain duplicate import names across packages "
+        f"(e.g. two packages both exporting the same top-level name). "
+        f"dedupe manually if you need a strict 1:1 mapping."
+    )
 
 
 if __name__ == "__main__":

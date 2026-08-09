@@ -21,8 +21,14 @@ MAX_RETRIES = 2
 
 # Packages to skip (meta-packages, namespace packages, etc.)
 SKIP_PACKAGES = {
-    "setuptools", "pip", "wheel", "distribute", "pkg-resources",
-    "pkg_resources", "easy-install", "easy_install",
+    "setuptools",
+    "pip",
+    "wheel",
+    "distribute",
+    "pkg-resources",
+    "pkg_resources",
+    "easy-install",
+    "easy_install",
 }
 
 # Manual overrides for packages where metadata is wrong or missing
@@ -233,7 +239,7 @@ def build_mapping_from_packages(packages: list[str]) -> dict[str, str]:
     # Process in batches
     batch_size = 500
     for batch_start in range(0, total, batch_size):
-        batch = packages[batch_start:batch_start + batch_size]
+        batch = packages[batch_start : batch_start + batch_size]
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {executor.submit(process_package, pkg): pkg for pkg in batch}
@@ -293,6 +299,7 @@ def fetch_all_pypi_packages_with_different_imports() -> dict[str, str]:
 
     return mapping
 
+
 def write_mappings_file(mapping: dict[str, str], output_path: Path) -> None:
     """Write the mapping dictionary to a Python file."""
     # Sort by import name for readability
@@ -303,7 +310,7 @@ def write_mappings_file(mapping: dict[str, str], output_path: Path) -> None:
         "Static mapping of Python import names to their PyPI package names.",
         "",
         "This covers cases where the import name differs from the pip install name.",
-        'For example: `import cv2` requires `pip install opencv-python`.',
+        "For example: `import cv2` requires `pip install opencv-python`.",
         "",
         f"Auto-generated with {len(sorted_items)} entries.",
         "To regenerate: python scripts/generate_mappings.py",
