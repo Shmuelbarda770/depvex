@@ -1,7 +1,7 @@
 import requests
 
 
-def save_pypi_packages_txt(filename="pypi_packages.txt"):
+def save_pypi_packages_txt(filename: str = "pypi_packages.txt") -> None:
     url = "https://raw.githubusercontent.com/hugovk/top-pypi-packages/main/top-pypi-packages-30-days.min.json"
 
     print("⏳ Downloading the full package list from PyPI...")

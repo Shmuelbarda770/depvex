@@ -23,7 +23,7 @@
 import requests
 
 
-def get_top_pypi_packages(limit=15000):
+def get_top_pypi_packages(limit: int = 15000) -> list[str]:
     url = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-30-days.min.json"
 
     response = requests.get(url)
@@ -39,7 +39,7 @@ def get_top_pypi_packages(limit=15000):
     return packages
 
 
-def get_existing_packages(filename="import_mapping.txt"):
+def get_existing_packages(filename: str = "import_mapping.txt") -> set[str]:
     packages = set()
 
     with open(filename, "r", encoding="utf-8") as f:
@@ -56,8 +56,11 @@ def get_existing_packages(filename="import_mapping.txt"):
     return packages
 
 
-def save_missing_packages(filename="missing_popular_packages.txt", packages=None):
+def save_missing_packages(filename: str = "missing_popular_packages.txt", packages: list[str] | None = None) -> None:
     with open(filename, "w", encoding="utf-8") as f:
+        if packages is None:
+            packages = []
+
         for package in packages:
             f.write(package + "\n")
 

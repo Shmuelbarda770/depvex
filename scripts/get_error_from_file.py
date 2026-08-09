@@ -4,7 +4,7 @@ INPUT_FILE = "top_level_results.jsonl"
 OUTPUT_FILE = "errors_packages.txt"
 
 
-def extract_errors():
+def extract_errors() -> None:
     errors = []
 
     with open(INPUT_FILE, encoding="utf-8") as f:

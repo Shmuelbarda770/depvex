@@ -49,7 +49,7 @@ def check_package(session: requests.Session, name: str) -> str | None:
         return None
 
 
-def main():
+def main() -> None:
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         packages = [line.strip() for line in f if line.strip()]
 

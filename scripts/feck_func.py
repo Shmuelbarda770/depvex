@@ -1,4 +1,4 @@
-def count_same_names(input_file):
+def count_same_names(input_file: str) -> None:
     count = 0
     matches = []
 

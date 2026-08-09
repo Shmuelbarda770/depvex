@@ -38,7 +38,7 @@ write_lock = Lock()
 session = requests.Session()
 
 
-def get_wheel_url(package_name):
+def get_wheel_url(package_name: str) -> tuple[str | None, int | None]:
     """Return (url, size) for the latest wheel of the package, or (None, None)"""
     r = session.get(f"https://pypi.org/pypi/{package_name}/json", timeout=15)
     r.raise_for_status()
@@ -53,7 +53,7 @@ def get_wheel_url(package_name):
     return None, None
 
 
-def fetch_range(url, start, end):
+def fetch_range(url: str, start: int, end: int) -> bytes:
     headers = {"Range": f"bytes={start}-{end}"}
     r = session.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
     r.raise_for_status()
@@ -63,7 +63,7 @@ def fetch_range(url, start, end):
     return r.content
 
 
-def get_central_directory(url, total_size):
+def get_central_directory(url: str, total_size: int) -> bytes:
     """Fetch only the tail of the file, find the EOCD, then fetch the Central Directory"""
     tail_size = min(TAIL_SIZE, total_size)
     tail = fetch_range(url, total_size - tail_size, total_size - 1)
@@ -79,7 +79,7 @@ def get_central_directory(url, total_size):
     return cd_data
 
 
-def find_entries(cd_data, suffix="top_level.txt"):
+def find_entries(cd_data: bytes, suffix: str = "top_level.txt") -> list[tuple[str, int, int, int]]:
     """Manual parse of the Central Directory, returns entries ending with the suffix"""
     offset = 0
     results = []
@@ -97,7 +97,7 @@ def find_entries(cd_data, suffix="top_level.txt"):
     return results
 
 
-def read_entry_data(url, local_offset, comp_size, method):
+def read_entry_data(url: str, local_offset: int, comp_size: int, method: int) -> str:
     """Fetch the local file header to obtain name/extra lengths, then fetch only the file data"""
     header = fetch_range(url, local_offset, local_offset + 29)
     _, _, _, _, _, _, _, _, _, name_len, extra_len = struct.unpack("<IHHHHHIIIHH", header)
@@ -113,18 +113,20 @@ def read_entry_data(url, local_offset, comp_size, method):
         raise ValueError(f"unsupported compression method: {method}")
 
 
-def process_package(name):
+def process_package(name: str) -> dict[str, str | list[str]]:
     try:
         url, size = get_wheel_url(name)
         if not url:
             return {"package": name, "error": "no wheel found"}
+        if not size:
+            return {"package": name, "error": "wheel size unknown"}
 
-        cd_data = get_central_directory(url, size)
+        cd_data: bytes = get_central_directory(url, size)
         entries = find_entries(cd_data)
         if not entries:
             return {"package": name, "error": "no top_level.txt in wheel"}
 
-        top_level = []
+        top_level: list[str] = []
         for entry_name, local_offset, comp_size, method in entries:
             content = read_entry_data(url, local_offset, comp_size, method)
             top_level.extend(line.strip() for line in content.splitlines() if line.strip())
@@ -134,7 +136,7 @@ def process_package(name):
         return {"package": name, "error": str(e)}
 
 
-def load_done(output_path):
+def load_done(output_path: str) -> set[str]:
     done = set()
     if Path(output_path).exists():
         with open(output_path, encoding="utf-8") as f:
@@ -146,7 +148,7 @@ def load_done(output_path):
     return done
 
 
-def main():
+def main() -> None:
     packages = [l.strip() for l in open(INPUT_FILE, encoding="utf-8") if l.strip()]
     done = load_done(OUTPUT_FILE)
     todo = [p for p in packages if p not in done]

@@ -1,6 +1,7 @@
 import importlib.util
 import os
 import re
+import sys
 import time
 import tomllib
 from collections.abc import Iterable, Iterator
@@ -9,16 +10,9 @@ from importlib.metadata import PackageNotFoundError, distribution, packages_dist
 from pathlib import Path
 from typing import Any
 
+import requests
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
-
-requests: Any | None = None
-try:
-    import requests as requests_module  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - defensive fallback
-    pass
-else:
-    requests = requests_module
 
 IMPORT_MAPPING_FILE = Path(__file__).resolve().parent / "import_mapping_filtered.txt"
 
@@ -58,7 +52,7 @@ class DependencyResolver:
     def __init__(self, parser: ImportExtractor | None = None, root: str = ".") -> None:
         self.parser = parser or ImportExtractor()
         self.root = root
-        self.python_version = f"{os.sys.version_info.major}.{os.sys.version_info.minor}"
+        self.python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
 
         yaml_config = read_yaml_config(start_dir=root)
         self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
@@ -177,10 +171,10 @@ class DependencyResolver:
 
         return normalized
 
-    def find_compatible_version(self, package: str, python_version: str):
+    def find_compatible_version(self, package: str, python_version: str) -> dict[str, Any]:
         url = f"https://pypi.org/pypi/{package}/json"
 
-        response = requests.get(url, timeout=5)
+        response: requests.Response = requests.get(url, timeout=5)
         response.raise_for_status()
 
         data = response.json()
