@@ -9,7 +9,7 @@ that contain multiple independently managed services.
 - AST-based detection of `import` and `from ... import ...` statements.
 - Standard-library filtering and per-import opt-out with `# ignore depvex`.
 - Recursive Python-file discovery with built-in ignored directories and YAML
-  `ignore_dirs` support.
+  `ignore_dirs` and `ignore_packages` support.
 - Import-module to installed-distribution mapping through `importlib.metadata`.
 - Version lookup from installed metadata without subprocesses, followed by an
   optional PyPI fallback.
@@ -18,6 +18,8 @@ that contain multiple independently managed services.
 - One-time scan, CI-oriented check, and debounced filesystem watch mode.
 - Per-service requirements files plus a root requirements file for
   microservice repositories.
+- Detailed check output for missing, stale, and changed entries.
+- Optional `[project].dependencies` sync/check and service dependency reports.
 
 ## Install
 
@@ -39,6 +41,7 @@ python -m pip install PyYAML
 depvex --scan .
 depvex --check .
 depvex --watch .
+depvex --report .
 ```
 
 - `--scan` updates requirements files.
@@ -46,6 +49,11 @@ depvex --watch .
   imports and `1` otherwise.
 - `--watch` performs an initial scan and updates files after created or
   modified Python-file events.
+- `--report` prints dependencies per service and shared dependencies without
+  changing files.
+
+Use `--pyproject` with `--scan` to write, or with `--check` to verify,
+`[project].dependencies` in an existing `pyproject.toml`.
 
 ### Version note
 
@@ -73,6 +81,10 @@ micro_servi_folders:
 
 ignore_dirs:
   - tests
+
+ignore_packages:
+  - pytest
+  - depvex
 ```
 
 Scanning the repository produces:
@@ -104,12 +116,11 @@ checking, so package metadata is available and the local code is executed:
 - run: depvex --check .
 ```
 
-`check` currently reports only an out-of-date result. Run `scan`, review the
-requirements diff, and commit expected changes.
+`check` reports missing, stale, and changed dependency entries. Run `scan`,
+review the resulting diff, and commit expected changes.
 
 ## Scope and roadmap
 
-Depvex does not resolve dynamic imports or replace a lockfile manager. Its
-next goals are consistent scan/check calculations, actionable dependency
-diffs, a canonical microservice configuration key, and automated tests for
-single-project, microservice, watch, and CI scenarios.
+Depvex does not resolve dynamic imports or replace a lockfile manager. Future
+work includes a canonical microservice configuration key and broader automated
+coverage for single-project, microservice, watch, and CI scenarios.
