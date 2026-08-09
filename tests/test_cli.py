@@ -1,8 +1,8 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
+import pytest 
+import depvex.resolver as resolver_module
 from depvex.cli import DepvexCLI  # ignore depvex
 from depvex.parser import ImportExtractor  # ignore depvex
 from depvex.resolver import DependencyResolver  # ignore depvex
@@ -68,6 +68,32 @@ def test_resolver_uses_import_mapping_when_module_is_not_installed(monkeypatch: 
         requirements = resolver.requirements_for(tmpdir)
 
         assert requirements == ["pyyaml"]
+
+
+def test_resolver_prefers_import_mapping_even_when_module_is_already_installed(monkeypatch: pytest.MonkeyPatch) -> None:
+    resolver = DependencyResolver(root=".")
+    resolver.IMPORT_MAPPING = {"dbt": ["dbt-core"]}
+    resolver.top_level_distributions = {}
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "is_installed", lambda self, module_name: True)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    assert resolver.resolve("dbt", has_net=False) == "dbt-core"
+
+
+def test_resolver_loads_mapping_from_package_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    package_dir = tmp_path / "depvex"
+    package_dir.mkdir()
+    (package_dir / "import_mapping_filtered.txt").write_text("yaml:pyyaml\n", encoding="utf-8")
+    module_path = package_dir / "resolver.py"
+    module_path.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(resolver_module, "__file__", str(module_path))
+    monkeypatch.setattr(resolver_module, "IMPORT_MAPPING_FILE", tmp_path / "missing.txt")
+
+    resolver = resolver_module.DependencyResolver(root=str(tmp_path))
+
+    assert resolver.IMPORT_MAPPING["yaml"] == ["pyyaml"]
 
 
 def test_check_prints_stale_dependencies(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:

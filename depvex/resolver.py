@@ -3,6 +3,7 @@ import os
 import re
 import time
 import tomllib
+
 from pathlib import Path
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
@@ -17,11 +18,32 @@ except ModuleNotFoundError:  # pragma: no cover - defensive fallback
 else:
     requests = requests_module
 
-IMPORT_MAPPING_FILE = Path(__file__).resolve().parents[1] / "import_mapping_filtered.txt"
+IMPORT_MAPPING_FILE = Path(__file__).resolve().parent / "import_mapping_filtered.txt"
 
 from depvex.parser import ImportExtractor  # ignore depvex
 from depvex.utils.read_config import project_config  # ignore depvex
 from depvex.utils.read_yaml_config import read_yaml_config  # ignore depvex
+
+
+def _resolve_import_mapping_path() -> Path:
+    configured_path = globals().get("IMPORT_MAPPING_FILE")
+    if configured_path is not None:
+        path = Path(configured_path)
+        if path.is_file():
+            return path
+
+    module_path = Path(__file__).resolve()
+    for candidate in (
+        module_path.parent / "import_mapping_filtered.txt",
+        module_path.parents[1] / "import_mapping_filtered.txt",
+    ):
+        if candidate.is_file():
+            return candidate
+
+    if configured_path is not None:
+        return Path(configured_path)
+
+    return module_path.parents[1] / "import_mapping_filtered.txt"
 
 
 class DependencyResolver:
@@ -103,26 +125,40 @@ class DependencyResolver:
     def resolve(self, module_name: str, has_net: bool) -> str:
         normalized_module = self._normalize_module_name(module_name)
         if not normalized_module:
+            print(f"[depvex][debug] resolve skipped empty module for {module_name!r}")
             return ""
 
-        if self.is_installed(normalized_module):
-            package_name = self._module_to_package_name(normalized_module)
+        print(f"[depvex][debug] resolving module={normalized_module} has_net={has_net}")
+        mapped = self._mapped_package_name(normalized_module)
+        if mapped:
+            print(f"[depvex][debug] module={normalized_module} mapped to package={mapped}")
+            package_name = mapped
+        elif self.is_installed(normalized_module):
+            print(f"[depvex][debug] module={normalized_module} is installed; using installed module name")
+            package_name = self._module_to_package_name(normalized_module, use_mapping=False)
         else:
-            package_name = self._mapped_package_name(normalized_module) or self._module_to_package_name(normalized_module)
+            package_name = self._module_to_package_name(normalized_module, use_mapping=True)
+            print(
+                f"[depvex][debug] module={normalized_module} has no mapping and is not installed; using fallback package={package_name}"
+            )
 
         version = self.get_local_version(package_name)
         if version:
+            print(f"[depvex][debug] package={package_name} has local version={version}")
             return f"{package_name}=={version}"
 
         if has_net:
             latest_version = self.get_pypi_version(package_name)
             if latest_version:
+                print(f"[depvex][debug] package={package_name} resolved latest version={latest_version}")
                 return f"{package_name}=={latest_version}"
+            print(f"[depvex][debug] package={package_name} has no network version; using package name")
             return package_name
 
+        print(f"[depvex][debug] package={package_name} returned without version info")
         return package_name
 
-    def _module_to_package_name(self, module_name: str) -> str:
+    def _module_to_package_name(self, module_name: str, use_mapping: bool = True) -> str:
         normalized = self._normalize_module_name(module_name)
         if not normalized:
             return normalized
@@ -131,9 +167,10 @@ class DependencyResolver:
         if candidate:
             return candidate[0]
 
-        mapped = self._mapped_package_name(normalized)
-        if mapped:
-            return mapped
+        if use_mapping:
+            mapped = self._mapped_package_name(normalized)
+            if mapped:
+                return mapped
 
         return normalized
 
@@ -150,68 +187,92 @@ class DependencyResolver:
 
     def _load_import_mapping_file(self) -> dict[str, list[str]]:
         mapping: dict[str, list[str]] = {}
-        if not IMPORT_MAPPING_FILE.is_file():
+        mapping_path = _resolve_import_mapping_path()
+        print(f"[depvex][debug] import mapping path={mapping_path}")
+        if not mapping_path.is_file():
+            print(f"[depvex][debug] import mapping file does not exist at {mapping_path}")
             return mapping
 
+        print(f"[depvex][debug] import mapping file exists at {mapping_path}")
         try:
-            with IMPORT_MAPPING_FILE.open("r", encoding="utf-8") as handle:
-                for line in handle:
+            with mapping_path.open("r", encoding="utf-8") as handle:
+                for line_number, line in enumerate(handle, start=1):
                     line = line.strip()
                     if not line or line.startswith("#"):
                         continue
 
                     parts = line.split(":", 1)
                     if len(parts) != 2:
+                        print(f"[depvex][debug] skipping malformed mapping line {line_number}: {line!r}")
                         continue
 
                     module_name = self._normalize_module_name(parts[0])
                     package_name = self._normalize_module_name(parts[1])
                     if module_name and package_name:
                         mapping.setdefault(module_name, []).append(package_name)
-        except (OSError, UnicodeDecodeError):
-            pass
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"[depvex][debug] failed to read import mapping file: {exc}")
+            return {}
 
+        print(f"[depvex][debug] loaded {len(mapping)} mapping entries from {mapping_path}")
         return mapping
 
     def _mapped_package_name(self, module_name: str) -> str | None:
         normalized = self._normalize_module_name(module_name)
         if not normalized:
+            print(f"[depvex][debug] cannot map empty module name")
             return None
 
         candidates = self.IMPORT_MAPPING.get(normalized)
         if not candidates:
+            print(f"[depvex][debug] no mapping found for module={normalized}")
             return None
 
         if len(candidates) == 1:
-            return candidates[0]
+            result = candidates[0]
+            print(f"[depvex][debug] mapping for module={normalized} -> {result}")
+            return result
 
         for candidate in candidates:
             if candidate == normalized:
+                print(f"[depvex][debug] mapping for module={normalized} -> {candidate}")
                 return candidate
-        return candidates[0]
+
+        result = candidates[0]
+        print(f"[depvex][debug] mapping for module={normalized} -> {result} (first candidate)")
+        return result
 
     def _read_existing_requirements(self, path: str) -> list[str]:
         if not os.path.exists(path):
+            print(f"[depvex][debug] requirements file does not exist at {path}")
             return []
 
-        with open(path, "r", encoding="utf-8") as handle:
-            return [line.strip() for line in handle if line.strip() and not line.strip().startswith("#")]
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                return [line.strip() for line in handle if line.strip() and not line.strip().startswith("#")]
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"[depvex][debug] failed to read requirements file {path}: {exc}")
+            return []
 
     def write_req(self, lines: Iterable[str], path: str = "requirements.txt") -> None:
         directory = os.path.dirname(path)
         if directory:
             os.makedirs(directory, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as handle:
-            for line in sorted(set(lines)):
-                handle.write(line + "\n")
+        try:
+            with open(path, "w", encoding="utf-8") as handle:
+                for line in sorted(set(lines)):
+                    handle.write(line + "\n")
+        except OSError as exc:
+            print(f"[depvex][debug] failed to write requirements file {path}: {exc}")
 
     def _get_imports_for_file(self, file_path: str) -> tuple[str, ...]:
         try:
             stat = os.stat(file_path)
             cache_key = (file_path, stat.st_mtime_ns)
             return self._get_imports_for_file_cached(cache_key)
-        except (OSError, SyntaxError, UnicodeDecodeError):
+        except (OSError, SyntaxError, UnicodeDecodeError) as exc:
+            print(f"[depvex][debug] failed to inspect imports for {file_path}: {exc}")
             return ()
 
     @lru_cache(maxsize=256)
@@ -220,7 +281,8 @@ class DependencyResolver:
         try:
             with open(file_path, "r", encoding="utf-8") as handle:
                 return tuple(self.parser.extract_imports(handle.read()))
-        except (OSError, SyntaxError, UnicodeDecodeError):
+        except (OSError, SyntaxError, UnicodeDecodeError) as exc:
+            print(f"[depvex][debug] failed to parse imports from {file_path}: {exc}")
             return ()
 
     def _get_active_service_folders(self, root: str) -> list[str]:

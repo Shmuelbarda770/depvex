@@ -717,7 +717,6 @@ _pi_heif:pi-heif
 pi_heif:pi-heif
 xmlrunner:unittest-xml-reporting
 build_tests:asana
-test:asana
 marshmallow_enum:marshmallow-enum
 rest_framework_simplejwt:djangorestframework-simplejwt
 allure:allure-python-commons
@@ -1038,7 +1037,6 @@ simple_term_menu:simple-term-menu
 datahub:acryl-datahub
 datahub_provider:acryl-datahub
 hcl2:bc-python-hcl2
-test:bc-python-hcl2
 keyrings:keyrings-alt
 mock-stubs:types-mock
 onnxruntime:onnxruntime-gpu
@@ -1105,7 +1103,6 @@ ibmdb_tests:ibm-db
 testfunctions:ibm-db
 sqlfluff_templater_dbt:sqlfluff-templater-dbt
 mkdocs_macros:mkdocs-macros-plugin
-test:mkdocs-macros-plugin
 azure:azure-mgmt-subscription
 pygments-stubs:types-pygments
 pytest_codspeed:pytest-codspeed
@@ -1147,8 +1144,6 @@ docling_parse:docling-parse
 psycopg2:aws-psycopg2
 pytorch_metric_learning:pytorch-metric-learning
 mypy_boto3_iam:mypy-boto3-iam
-PyObjCTest:pyobjc-core
-PyObjCTools:pyobjc-core
 objc:pyobjc-core
 django_structlog:django-structlog
 databricks:databricks-feature-engineering
@@ -1162,7 +1157,6 @@ zc:zc-lockfile
 _rjsmin:rjsmin
 wagtail_factories:wagtail-factories
 treebeard:django-treebeard
-test:torchao
 soda_core:soda-core
 dynamodb_json:dynamodb-json
 tests:dynamodb-json
@@ -1176,14 +1170,12 @@ hijri_converter:hijri-converter
 crispy_forms:django-crispy-forms
 pyhdbcli:hdbcli
 sqlalchemy_drill:sqlalchemy-drill
-test:sqlalchemy-drill
 repoze:repoze-lru
 cv2:opencv-contrib-python-headless
 AppKit:pyobjc-framework-cocoa
 Cocoa:pyobjc-framework-cocoa
 CoreFoundation:pyobjc-framework-cocoa
 Foundation:pyobjc-framework-cocoa
-PyObjCTest:pyobjc-framework-cocoa
 PyObjCTools:pyobjc-framework-cocoa
 azure:azure-mgmt-domainregistration
 httpx_auth:httpx-auth
@@ -1297,7 +1289,6 @@ examples:casbin
 node_modules:casbin
 comfyui_embedded_docs:comfyui-embedded-docs
 hypothesis_jsonschema:hypothesis-jsonschema
-test:stringzilla
 compressor:django-compressor
 vagrant:python-vagrant
 scourgify:usaddress-scourgify
@@ -1405,7 +1396,7 @@ fugue_ibis:fugue
 fugue_notebook:fugue
 fugue_polars:fugue
 fugue_ray:fugue
-fugue_spark:fugue
+fugue_spark:fugu
 fugue_sql:fugue
 fugue_test:fugue
 fhir:fhir-resources
@@ -2216,7 +2207,6 @@ databases/backends/compilers:databases
 databases/backends/dialects:databases
 md2conf:markdown-to-confluence
 zfit_interface:zfit-interface
-conftest:splinebox
 google:google-cloud-modelarmor
 robust_downloader:robust-downloader
 snowflake:snowflake-ml-python
@@ -12399,7 +12389,6 @@ pyan:pyan3
 fast_query_parsers:fast-query-parsers
 warrant_lite:warrant-lite
 kroki:mkdocs-kroki-plugin
-conftest:pycampbellcr1000
 geocodio:pygeocodio
 shipyard_neo:shipyard-neo-sdk
 egl_probe:egl-probe

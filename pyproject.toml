@@ -40,6 +40,10 @@ where = ["."]
 include = ["depvex*"]
 exclude = ["depvex.__pycache__", "depvex.__pycache__.*"]
 
+
+[tool.setuptools.package-data]
+depvex = ["import_mapping_filtered.txt"]
+
 [tool.setuptools.exclude-package-data]
 depvex = ["**/__pycache__/**", "**/*.py[cod]"]
 
