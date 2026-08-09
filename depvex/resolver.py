@@ -7,6 +7,8 @@ import tomllib
 from pathlib import Path
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
+from packaging.version import Version
+from packaging.specifiers import SpecifierSet
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
 from typing import Any
 
@@ -56,6 +58,7 @@ class DependencyResolver:
     def __init__(self, parser: ImportExtractor | None = None, root: str = ".") -> None:
         self.parser = parser or ImportExtractor()
         self.root = root
+        self.python_version = f"{os.sys.version_info.major}.{os.sys.version_info.minor}"
 
         yaml_config = read_yaml_config(start_dir=root)
         self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
@@ -173,6 +176,56 @@ class DependencyResolver:
                 return mapped
 
         return normalized
+    def find_compatible_version(self, package: str, python_version: str):
+        url = f"https://pypi.org/pypi/{package}/json"
+
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+
+        data = response.json()
+
+        compatible_versions = []
+
+        for version_string, files in data["releases"].items():
+            if not files:
+                continue
+
+            try:
+                version = Version(version_string)
+            except Exception:
+                continue
+
+            if all(file.get("yanked", False) for file in files):
+                continue
+
+            for file in files:
+                requires_python = file.get("requires_python")
+
+                if not requires_python:
+                    continue
+
+                try:
+                    specifier = SpecifierSet(requires_python)
+
+                    if Version(python_version) in specifier:
+                        compatible_versions.append(version)
+                        break
+
+                except Exception:
+                    continue
+
+        if not compatible_versions:
+            return {
+                "compatible": False,
+                "latest_compatible": None,
+            }
+
+        latest = max(compatible_versions)
+
+        return {
+            "compatible": True,
+            "latest_compatible": str(latest),
+        }
 
     def _normalize_module_name(self, module_name: str) -> str:
         name = module_name.strip()
