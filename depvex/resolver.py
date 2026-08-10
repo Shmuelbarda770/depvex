@@ -98,14 +98,14 @@ class DependencyResolver:
     def is_installed(self, module_name: str) -> bool:
         return importlib.util.find_spec(module_name) is not None
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=512)
     def get_local_version(self, module_name: str) -> str | None:
         try:
             return distribution(module_name).version
         except PackageNotFoundError:
             return None
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=512)
     def get_pypi_version(self, module_name: str) -> str | None:
         if requests is None:
             return None
@@ -323,7 +323,7 @@ class DependencyResolver:
             print(f"[depvex][debug] failed to inspect imports for {file_path}: {exc}")
             return ()
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=512)
     def _get_imports_for_file_cached(self, cache_key: tuple[str, int]) -> tuple[str, ...]:
         file_path, _ = cache_key
         try:
