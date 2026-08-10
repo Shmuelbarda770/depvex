@@ -15,31 +15,38 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 IMPORT_MAPPING_FILE = Path(__file__).resolve().parent / "import_mapping_filtered.txt"
+POPULARITY_MAPPING_FILE = Path(__file__).resolve().parent / "duplicate_imports_pop.txt"
 
 from depvex.parser import ImportExtractor  # ignore depvex
 from depvex.utils.read_config import project_config  # ignore depvex
 from depvex.utils.read_yaml_config import read_yaml_config  # ignore depvex
 
 
-def _resolve_import_mapping_path() -> Path:
-    configured_path = globals().get("IMPORT_MAPPING_FILE")
-    if configured_path is not None:
-        path = Path(configured_path)
-        if path.is_file():
-            return path
+def _resolve_file_path(filename: str, configured_var_name: str | None = None) -> Path:
+    if configured_var_name and configured_var_name in globals():
+        configured_path = globals()[configured_var_name]
+        if configured_path is not None:
+            path = Path(configured_path)
+            if path.is_file():
+                return path
 
     module_path = Path(__file__).resolve()
     for candidate in (
-        module_path.parent / "import_mapping_filtered.txt",
-        module_path.parents[1] / "import_mapping_filtered.txt",
+        module_path.parent / filename,
+        module_path.parents[1] / filename,
     ):
         if candidate.is_file():
             return candidate
 
-    if configured_path is not None:
-        return Path(configured_path)
+    return module_path.parent / filename
 
-    return module_path.parents[1] / "import_mapping_filtered.txt"
+
+def _resolve_import_mapping_path() -> Path:
+    return _resolve_file_path("import_mapping_filtered.txt", "IMPORT_MAPPING_FILE")
+
+
+def _resolve_popularity_mapping_path() -> Path:
+    return _resolve_file_path("duplicate_imports_pop.txt", "POPULARITY_MAPPING_FILE")
 
 
 class DependencyResolver:
@@ -69,6 +76,7 @@ class DependencyResolver:
             self.top_level_distributions = {}
 
         self.IMPORT_MAPPING = self._load_import_mapping_file()
+        self.POPULARITY_MAPPING = self._load_popularity_mapping_file()
 
     def _is_ignored_dir(self, rel_path: str) -> bool:
         if not self.IGNORE_DIRS:
@@ -265,6 +273,58 @@ class DependencyResolver:
         print(f"[depvex][debug] loaded {len(mapping)} mapping entries from {mapping_path}")
         return mapping
 
+    def _load_popularity_mapping_file(self) -> dict[str, str]:
+        popularity_map: dict[str, str] = {}
+        pop_path = _resolve_popularity_mapping_path()
+        if not pop_path.is_file():
+            print(f"[depvex][debug] popularity file does not exist at {pop_path}")
+            return popularity_map
+
+        current_module = None
+        max_downloads = -1
+        best_package = None
+
+        pkg_pattern = re.compile(r"^\s*([A-Za-z0-9_.-]+)\s*\|\s*downloads:\s*([0-9,]+)", re.IGNORECASE)
+
+        try:
+            with pop_path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    raw_line = line.rstrip()
+                    if not raw_line or raw_line.startswith("#"):
+                        continue
+
+                    if raw_line.strip().endswith(":"):
+                        if current_module and best_package:
+                            popularity_map[current_module] = best_package
+
+                        current_module = self._normalize_module_name(raw_line.strip().rstrip(":"))
+                        max_downloads = -1
+                        best_package = None
+                        continue
+
+                    match = pkg_pattern.match(raw_line)
+                    if match and current_module:
+                        pkg_name = self._normalize_module_name(match.group(1))
+                        downloads_str = match.group(2).replace(",", "")
+                        try:
+                            downloads = int(downloads_str)
+                        except ValueError:
+                            downloads = 0
+
+                        if downloads > max_downloads:
+                            max_downloads = downloads
+                            best_package = pkg_name
+
+                if current_module and best_package:
+                    popularity_map[current_module] = best_package
+
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"[depvex][debug] failed to read popularity mapping file: {exc}")
+            return {}
+
+        print(f"[depvex][debug] loaded {len(popularity_map)} popular choices from {pop_path}")
+        return popularity_map
+
     def _mapped_package_name(self, module_name: str) -> str | None:
         normalized = self._normalize_module_name(module_name)
         if not normalized:
@@ -280,6 +340,11 @@ class DependencyResolver:
             result = candidates[0]
             print(f"[depvex][debug] mapping for module={normalized} -> {result}")
             return result
+
+        popular_choice = self.POPULARITY_MAPPING.get(normalized)
+        if popular_choice and popular_choice in candidates:
+            print(f"[depvex][debug] popularity map for module={normalized} -> {popular_choice}")
+            return popular_choice
 
         for candidate in candidates:
             if candidate == normalized:

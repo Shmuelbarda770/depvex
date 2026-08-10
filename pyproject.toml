@@ -42,7 +42,7 @@ exclude = ["depvex.__pycache__", "depvex.__pycache__.*"]
 
 
 [tool.setuptools.package-data]
-depvex = ["import_mapping_filtered.txt"]
+depvex = ["import_mapping_filtered.txt","duplicate_imports_pop.txt",]
 
 [tool.setuptools.exclude-package-data]
 depvex = ["**/__pycache__/**", "**/*.py[cod]"]
