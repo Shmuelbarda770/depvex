@@ -89,15 +89,11 @@ def test_write_requirements_contains_popular_package(
     ):
         resolver = DependencyResolver(root=str(tmp_path))
 
-        resolver._rebuild_single(
-            root=str(tmp_path), output_path=str(req_file), prune_stale=False
-        )
+        resolver._rebuild_single(root=str(tmp_path), output_path=str(req_file), prune_stale=False)
 
         written_content = req_file.read_text(encoding="utf-8").splitlines()
 
         assert any(line.startswith("types-aioboto3") for line in written_content)
         assert any(line.startswith("sap-ai-sdk-core") for line in written_content)
-        assert not any(
-            line.startswith("types-aioboto3-lite") for line in written_content
-        )
+        assert not any(line.startswith("types-aioboto3-lite") for line in written_content)
         assert not any(line.startswith("ai-core-sdk") for line in written_content)
