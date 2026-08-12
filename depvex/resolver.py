@@ -16,7 +16,7 @@ from packaging.version import Version
 IMPORT_MAPPING_FILE = Path(__file__).resolve().parent / "import_mapping_filtered.txt"
 POPULARITY_MAPPING_FILE = Path(__file__).resolve().parent / "duplicate_imports_pop.txt"
 
-from depvex.parser import ImportExtractor 
+from depvex.parser import ImportExtractor
 from depvex.utils.read_config import project_config
 from depvex.utils.read_yaml_config import read_yaml_config
 
@@ -76,7 +76,7 @@ class DependencyResolver:
 
         self.IMPORT_MAPPING = self._load_import_mapping_file()
         self.POPULARITY_MAPPING = self._load_popularity_mapping_file()
-        
+
         self.local_modules = self._index_local_modules(self.root)
 
     def _index_local_modules(self, root_dir: str) -> set[str]:
@@ -105,7 +105,7 @@ class DependencyResolver:
 
             if parts:
                 local_mods.add(".".join(parts).lower())
-                
+
                 for i in range(1, len(parts) + 1):
                     local_mods.add(".".join(parts[:i]).lower())
 
@@ -123,7 +123,7 @@ class DependencyResolver:
             return True
 
         normalized = self._normalize_module_name(module_name)
-        
+
         if module_name.startswith("."):
             return True
 
@@ -138,14 +138,30 @@ class DependencyResolver:
 
     def is_stdlib_module(self, module_name: str) -> bool:
         normalized = self._normalize_module_name(module_name).split(".")[0]
-        
+
         if hasattr(sys, "stdlib_module_names"):
             return normalized in sys.stdlib_module_names
-            
+
         stdlib_fallback = {
-            "os", "sys", "re", "time", "pathlib", "typing", "collections",
-            "functools", "importlib", "json", "ast", "unittest", "tempfile",
-            "math", "random", "subprocess", "shutil", "logging", "threading"
+            "os",
+            "sys",
+            "re",
+            "time",
+            "pathlib",
+            "typing",
+            "collections",
+            "functools",
+            "importlib",
+            "json",
+            "ast",
+            "unittest",
+            "tempfile",
+            "math",
+            "random",
+            "subprocess",
+            "shutil",
+            "logging",
+            "threading",
         }
         return normalized in stdlib_fallback
 
@@ -158,7 +174,7 @@ class DependencyResolver:
 
     def _is_ignored_package(self, module_name: str) -> bool:
         module = self._normalize_module_name(module_name)
-        
+
         if self.is_local_import(module_name) or self.is_stdlib_module(module_name):
             return True
 
