@@ -9,6 +9,7 @@ from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
 from pathlib import Path
 from typing import Any
+
 import requests
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
