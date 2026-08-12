@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-import depvex.resolver as resolver_module  # ignore depvex
-from depvex.cli import DepvexCLI  # ignore depvex
-from depvex.parser import ImportExtractor  # ignore depvex
-from depvex.resolver import DependencyResolver  # ignore depvex
+import depvex.resolver as resolver_module
+from depvex.cli import DepvexCLI
+from depvex.parser import ImportExtractor
+from depvex.resolver import DependencyResolver
 
 
 def test_scan_updates_requirements_for_a_single_run() -> None:

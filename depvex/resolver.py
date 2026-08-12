@@ -15,31 +15,38 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 IMPORT_MAPPING_FILE = Path(__file__).resolve().parent / "import_mapping_filtered.txt"
+POPULARITY_MAPPING_FILE = Path(__file__).resolve().parent / "duplicate_imports_pop.txt"
 
-from depvex.parser import ImportExtractor  # ignore depvex
-from depvex.utils.read_config import project_config  # ignore depvex
-from depvex.utils.read_yaml_config import read_yaml_config  # ignore depvex
+from depvex.parser import ImportExtractor
+from depvex.utils.read_config import project_config
+from depvex.utils.read_yaml_config import read_yaml_config
 
 
-def _resolve_import_mapping_path() -> Path:
-    configured_path = globals().get("IMPORT_MAPPING_FILE")
-    if configured_path is not None:
-        path = Path(configured_path)
-        if path.is_file():
-            return path
+def _resolve_file_path(filename: str, configured_var_name: str | None = None) -> Path:
+    if configured_var_name and configured_var_name in globals():
+        configured_path = globals()[configured_var_name]
+        if configured_path is not None:
+            path = Path(configured_path)
+            if path.is_file():
+                return path
 
     module_path = Path(__file__).resolve()
     for candidate in (
-        module_path.parent / "import_mapping_filtered.txt",
-        module_path.parents[1] / "import_mapping_filtered.txt",
+        module_path.parent / filename,
+        module_path.parents[1] / filename,
     ):
         if candidate.is_file():
             return candidate
 
-    if configured_path is not None:
-        return Path(configured_path)
+    return module_path.parent / filename
 
-    return module_path.parents[1] / "import_mapping_filtered.txt"
+
+def _resolve_import_mapping_path() -> Path:
+    return _resolve_file_path("import_mapping_filtered.txt", "IMPORT_MAPPING_FILE")
+
+
+def _resolve_popularity_mapping_path() -> Path:
+    return _resolve_file_path("duplicate_imports_pop.txt", "POPULARITY_MAPPING_FILE")
 
 
 class DependencyResolver:
@@ -51,10 +58,10 @@ class DependencyResolver:
 
     def __init__(self, parser: ImportExtractor | None = None, root: str = ".") -> None:
         self.parser = parser or ImportExtractor()
-        self.root = root
+        self.root = os.path.abspath(root)
         self.python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
 
-        yaml_config = read_yaml_config(start_dir=root)
+        yaml_config = read_yaml_config(start_dir=self.root)
         self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
         self.IGNORE_DIRS: set[str] = set(getattr(yaml_config, "ignore_dirs", []))
         self.IGNORE_PACKAGES: set[str] = {
@@ -69,6 +76,95 @@ class DependencyResolver:
             self.top_level_distributions = {}
 
         self.IMPORT_MAPPING = self._load_import_mapping_file()
+        self.POPULARITY_MAPPING = self._load_popularity_mapping_file()
+
+        self.local_modules = self._index_local_modules(self.root)
+
+    def _index_local_modules(self, root_dir: str) -> set[str]:
+
+        local_mods = set()
+        root_path = Path(root_dir).resolve()
+
+        skip_dirs = {".git", "__pycache__", ".venv", "venv", "env", "node_modules", "build", "dist", "site-packages"}
+        skip_dirs.update(self.IGNORE_DIRS)
+
+        for path in root_path.rglob("*.py"):
+            try:
+                rel_path = path.relative_to(root_path)
+            except ValueError:
+                continue
+
+            if any(part in skip_dirs or part.startswith(".") for part in rel_path.parts):
+                continue
+
+            parts = list(rel_path.with_suffix("").parts)
+            if not parts:
+                continue
+
+            if parts[-1] == "__init__":
+                parts.pop()
+
+            if parts:
+                local_mods.add(".".join(parts).lower())
+
+                for i in range(1, len(parts) + 1):
+                    local_mods.add(".".join(parts[:i]).lower())
+
+        for entry in root_path.iterdir():
+            if entry.name not in skip_dirs and not entry.name.startswith("."):
+                local_mods.add(entry.name.lower())
+                if entry.is_file() and entry.suffix == ".py":
+                    local_mods.add(entry.stem.lower())
+
+        print(f"[depvex][debug] indexed {len(local_mods)} local module paths/roots in project")
+        return local_mods
+
+    def is_local_import(self, module_name: str) -> bool:
+        if not module_name:
+            return True
+
+        normalized = self._normalize_module_name(module_name)
+
+        if module_name.startswith("."):
+            return True
+
+        if normalized in self.local_modules:
+            return True
+
+        root_module = normalized.split(".")[0]
+        if root_module in self.local_modules:
+            return True
+
+        return False
+
+    def is_stdlib_module(self, module_name: str) -> bool:
+        normalized = self._normalize_module_name(module_name).split(".")[0]
+
+        if hasattr(sys, "stdlib_module_names"):
+            return normalized in sys.stdlib_module_names
+
+        stdlib_fallback = {
+            "os",
+            "sys",
+            "re",
+            "time",
+            "pathlib",
+            "typing",
+            "collections",
+            "functools",
+            "importlib",
+            "json",
+            "ast",
+            "unittest",
+            "tempfile",
+            "math",
+            "random",
+            "subprocess",
+            "shutil",
+            "logging",
+            "threading",
+        }
+        return normalized in stdlib_fallback
 
     def _is_ignored_dir(self, rel_path: str) -> bool:
         if not self.IGNORE_DIRS:
@@ -79,6 +175,10 @@ class DependencyResolver:
 
     def _is_ignored_package(self, module_name: str) -> bool:
         module = self._normalize_module_name(module_name)
+
+        if self.is_local_import(module_name) or self.is_stdlib_module(module_name):
+            return True
+
         package = self._normalize_module_name(self._module_to_package_name(module_name))
         return module in self.IGNORE_PACKAGES or package in self.IGNORE_PACKAGES
 
@@ -98,14 +198,14 @@ class DependencyResolver:
     def is_installed(self, module_name: str) -> bool:
         return importlib.util.find_spec(module_name) is not None
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=512)
     def get_local_version(self, module_name: str) -> str | None:
         try:
             return distribution(module_name).version
         except PackageNotFoundError:
             return None
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=512)
     def get_pypi_version(self, module_name: str) -> str | None:
         if requests is None:
             return None
@@ -123,6 +223,10 @@ class DependencyResolver:
         normalized_module = self._normalize_module_name(module_name)
         if not normalized_module:
             print(f"[depvex][debug] resolve skipped empty module for {module_name!r}")
+            return ""
+
+        if self.is_local_import(module_name) or self.is_stdlib_module(module_name):
+            print(f"[depvex][debug] skipping local/stdlib module={normalized_module}")
             return ""
 
         print(f"[depvex][debug] resolving module={normalized_module} has_net={has_net}")
@@ -265,6 +369,58 @@ class DependencyResolver:
         print(f"[depvex][debug] loaded {len(mapping)} mapping entries from {mapping_path}")
         return mapping
 
+    def _load_popularity_mapping_file(self) -> dict[str, str]:
+        popularity_map: dict[str, str] = {}
+        pop_path = _resolve_popularity_mapping_path()
+        if not pop_path.is_file():
+            print(f"[depvex][debug] popularity file does not exist at {pop_path}")
+            return popularity_map
+
+        current_module = None
+        max_downloads = -1
+        best_package = None
+
+        pkg_pattern = re.compile(r"^\s*([A-Za-z0-9_.-]+)\s*\|\s*downloads:\s*([0-9,]+)", re.IGNORECASE)
+
+        try:
+            with pop_path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    raw_line = line.rstrip()
+                    if not raw_line or raw_line.startswith("#"):
+                        continue
+
+                    if raw_line.strip().endswith(":"):
+                        if current_module and best_package:
+                            popularity_map[current_module] = best_package
+
+                        current_module = self._normalize_module_name(raw_line.strip().rstrip(":"))
+                        max_downloads = -1
+                        best_package = None
+                        continue
+
+                    match = pkg_pattern.match(raw_line)
+                    if match and current_module:
+                        pkg_name = self._normalize_module_name(match.group(1))
+                        downloads_str = match.group(2).replace(",", "")
+                        try:
+                            downloads = int(downloads_str)
+                        except ValueError:
+                            downloads = 0
+
+                        if downloads > max_downloads:
+                            max_downloads = downloads
+                            best_package = pkg_name
+
+                if current_module and best_package:
+                    popularity_map[current_module] = best_package
+
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"[depvex][debug] failed to read popularity mapping file: {exc}")
+            return {}
+
+        print(f"[depvex][debug] loaded {len(popularity_map)} popular choices from {pop_path}")
+        return popularity_map
+
     def _mapped_package_name(self, module_name: str) -> str | None:
         normalized = self._normalize_module_name(module_name)
         if not normalized:
@@ -280,6 +436,11 @@ class DependencyResolver:
             result = candidates[0]
             print(f"[depvex][debug] mapping for module={normalized} -> {result}")
             return result
+
+        popular_choice = self.POPULARITY_MAPPING.get(normalized)
+        if popular_choice and popular_choice in candidates:
+            print(f"[depvex][debug] popularity map for module={normalized} -> {popular_choice}")
+            return popular_choice
 
         for candidate in candidates:
             if candidate == normalized:
@@ -307,9 +468,10 @@ class DependencyResolver:
         if directory:
             os.makedirs(directory, exist_ok=True)
 
+        valid_lines = [line for line in lines if line]
         try:
             with open(path, "w", encoding="utf-8") as handle:
-                for line in sorted(set(lines)):
+                for line in sorted(set(valid_lines)):
                     handle.write(line + "\n")
         except OSError as exc:
             print(f"[depvex][debug] failed to write requirements file {path}: {exc}")
@@ -323,7 +485,7 @@ class DependencyResolver:
             print(f"[depvex][debug] failed to inspect imports for {file_path}: {exc}")
             return ()
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=512)
     def _get_imports_for_file_cached(self, cache_key: tuple[str, int]) -> tuple[str, ...]:
         file_path, _ = cache_key
         try:
@@ -395,13 +557,17 @@ class DependencyResolver:
                 if normalized_package in existing_by_name:
                     requirements.append(existing_by_name[normalized_package])
                 else:
-                    requirements.append(self.resolve(module_name, has_net))
+                    res = self.resolve(module_name, has_net)
+                    if res:
+                        requirements.append(res)
 
             return requirements
 
         for module_name in sorted(discovered):
             if module_name:
-                requirements.append(self.resolve(module_name, has_net))
+                res = self.resolve(module_name, has_net)
+                if res:
+                    requirements.append(res)
 
         return requirements
 
@@ -480,8 +646,10 @@ class DependencyResolver:
             requirements: list[str] = []
 
             for module_name in module_list:
-                if self.is_installed(module_name):
-                    requirements.append(self.resolve(module_name, has_net))
+                if self.is_installed(module_name) and not self.is_local_import(module_name):
+                    res = self.resolve(module_name, has_net)
+                    if res:
+                        requirements.append(res)
 
             if requirements != last_req:
                 print("\n[depvex] REQUIREMENTS UPDATED")
