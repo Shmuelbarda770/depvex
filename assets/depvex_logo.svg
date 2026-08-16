@@ -1,0 +1,44 @@
+<svg width="1408" height="768" viewBox="0 0 1408 768" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="#eefaf9"/>
+      <stop offset="45%" stop-color="#e2e7fb"/>
+      <stop offset="100%" stop-color="#c7cdf5"/>
+    </radialGradient>
+
+    <linearGradient id="blueGradient" x1="0%" y1="20%" x2="100%" y2="80%">
+      <stop offset="0%" stop-color="#63dfd4"/>
+      <stop offset="55%" stop-color="#54a9ee"/>
+      <stop offset="100%" stop-color="#4577ef"/>
+    </linearGradient>
+
+    <linearGradient id="orangeGradient" x1="0%" y1="20%" x2="100%" y2="80%">
+      <stop offset="0%" stop-color="#f2ac52"/>
+      <stop offset="55%" stop-color="#f68a49"/>
+      <stop offset="100%" stop-color="#f2653f"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#33477a" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="1408" height="768" fill="url(#bgGlow)"/>
+
+  <g font-family="Poppins, 'Segoe UI Rounded', 'Arial Rounded MT Bold', Verdana, sans-serif"
+     font-weight="700"
+     font-size="200"
+     filter="url(#softShadow)">
+    <text x="318.8" y="410" fill="url(#blueGradient)">Dep</text>
+    <text x="723.2" y="410" fill="url(#orangeGradient)">vex</text>
+  </g>
+
+  <text x="704" y="545"
+        text-anchor="middle"
+        font-family="Poppins, 'Segoe UI', Verdana, sans-serif"
+        font-weight="500"
+        font-size="42"
+        letter-spacing="0.5"
+        fill="#2b3550"
+        opacity="0.85">The dependency manager for your project</text>
+</svg>

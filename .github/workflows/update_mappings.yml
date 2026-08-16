@@ -1,0 +1,48 @@
+# name: Update known_mappings
+
+# on:
+#   schedule:
+#     # Every Sunday at 03:00 UTC
+#     - cron: "0 3 * * 0"
+#   workflow_dispatch:   # allow manual trigger from GitHub UI
+
+# permissions:
+#   contents: write
+#   pull-requests: write
+
+# jobs:
+#   update-mappings:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.12"
+
+#       - name: Install dependencies
+#         run: pip install requests
+
+#       - name: Regenerate known_mappings.py
+#         run: python scripts/generate_mappings.py
+
+#       - name: Check for changes
+#         id: diff
+#         run: |
+#           git diff --exit-code depvex/known_mappings.py || echo "changed=true" >> "$GITHUB_OUTPUT"
+
+#       - name: Open PR if mappings changed
+#         if: steps.diff.outputs.changed == 'true'
+#         uses: peter-evans/create-pull-request@v6
+#         with:
+#           token: ${{ secrets.GITHUB_TOKEN }}
+#           branch: chore/update-known-mappings
+#           commit-message: "chore: regenerate known_mappings.py"
+#           title: "chore: weekly known_mappings update"
+#           body: |
+#             Automated weekly refresh of `depvex/known_mappings.py`.
+
+#             Re-generated from the top PyPI packages list via `scripts/generate_mappings.py`.
+#             Please review the diff before merging.
+#           labels: dependencies

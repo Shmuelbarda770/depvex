@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="assets/depvex_logo.svg" alt="depvex logo" width="700">
+</p>
+
+<h1 align="center">depvex</h1>
+
+<p align="center">
+  The dependency manager for your project
+</p>
+
 # depvex
 
 `depvex` generates and checks `requirements.txt` files from static Python
