@@ -506,7 +506,7 @@ class DependencyResolver:
 
     def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None) -> Iterator[str]:
         exclude_dirs = exclude_dirs or set()
-        base_skip = {".git", "__pycache__", ".venv", "venv", "node_modules"}
+        base_skip = {".git", "__pycache__", ".venv", "venv", "node_modules", ".tox", ".mypy_cache", ".pytest_cache"}
         root_abs = os.path.abspath(root)
 
         for dirpath, dirnames, filenames in os.walk(root):
@@ -535,7 +535,7 @@ class DependencyResolver:
         if output_path is None:
             output_path = os.path.join(root, "requirements.txt")
 
-        requirements: list[str] = []
+        requirements: list[str] = []x
         has_net = self.internet_check()
 
         if prune_stale and os.path.exists(output_path):

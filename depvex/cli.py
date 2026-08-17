@@ -26,6 +26,9 @@ class DepvexCLI:
         commands.add_argument(
             "--report", action="store_const", const="report", dest="command", help="Report dependencies"
         )
+        commands.add_argument(
+            "--format", action="store_const", const="format", dest="command", help="Format dependencies"
+        )
         parser.add_argument("--pyproject", action="store_true", help="Also sync or check pyproject.toml dependencies")
         parser.add_argument("path", nargs="?", default=".")
         return parser
@@ -239,6 +242,7 @@ class DepvexCLI:
 
         if args.command == "report":
             return self.report(args.path)
+
 
         self.parser.print_help()
         return 1
