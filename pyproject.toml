@@ -9,6 +9,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "depvex"
+license = { text = "MIT" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
 readme = "README_PYPI.md"
 dynamic = ["version"]
 description = "Dependency and environment checker tool"
