@@ -68,14 +68,9 @@ def read_requirements_txt(path: str) -> list[str]:
 
 
 def write_pyproject_deps(lines: Iterable[str], path: str) -> None:
-    """Update ``[project.dependencies]`` in an existing pyproject.toml or create one.
-
-    Version pins use ``>=`` (safe minimum) rather than ``==``, which is
-    the correct style for a project's direct-dependency declarations.
-    """
     unique = _unique_entries(lines)
     entries = sorted(
-        f"{name}>={version}" if version else name
+        f"{name}=={version}" if version else name
         for name, version in unique.items()
     )
     deps_text = "dependencies = [\n" + "".join(f'  "{e}",\n' for e in entries) + "]\n"
@@ -136,7 +131,7 @@ def write_pipfile(lines: Iterable[str], path: str) -> None:
     """Write or update the ``[packages]`` section of a Pipfile."""
     unique = _unique_entries(lines)
     pkg_lines = "".join(
-        f'{name} = "{version}"\n' if version else f'{name} = "*"\n'
+        f'{name} = "=={version}"\n' if version else f'{name} = "*"\n'
         for name, version in sorted(unique.items())
     )
     packages_block = f"[packages]\n{pkg_lines}"
@@ -175,11 +170,11 @@ def read_pipfile_deps(path: str) -> list[str]:
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        # name = "3.1.0"  or  name = "*"
+        # name = "==3.1.0"  or  name = "*"
         parts = line.split("=", 1)
         name = parts[0].strip()
         if len(parts) == 2:
-            version = parts[1].strip().strip('"').strip("'")
+            version = parts[1].strip().strip('"').strip("'").lstrip("=")
             result.append(f"{name}=={version}" if version != "*" else name)
         else:
             result.append(name)

@@ -21,6 +21,16 @@ from depvex.parser import ImportExtractor
 from depvex.utils.read_config import project_config
 from depvex.utils.read_yaml_config import read_yaml_config
 
+from depvex.writers import (
+    VALID_FORMATS,
+    detect_output_format,
+    output_filename,
+    read_deps,
+    write_deps,
+)
+from depvex.lock_readers import LockFileReader
+from depvex.sbom import write_sbom
+
 
 def _resolve_file_path(filename: str, configured_var_name: str | None = None) -> Path:
     if configured_var_name and configured_var_name in globals():
@@ -56,7 +66,12 @@ class DependencyResolver:
         ["http://connectivitycheck.gstatic.com/generate_204"],
     )
 
-    def __init__(self, parser: ImportExtractor | None = None, root: str = ".") -> None:
+    def __init__(
+        self,
+        parser: ImportExtractor | None = None,
+        root: str = ".",
+        output_format: str | None = None,
+    ) -> None:
         self.parser = parser or ImportExtractor()
         self.root = os.path.abspath(root)
         self.python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
@@ -79,6 +94,22 @@ class DependencyResolver:
         self.POPULARITY_MAPPING = self._load_popularity_mapping_file()
 
         self.local_modules = self._index_local_modules(self.root)
+
+        # פורמט הפלט: אם לא נבחר במפורש, מזהים אוטומטית לפי קבצים קיימים
+        # בפרויקט (Pipfile / environment.yml / pyproject.toml), ואם אין
+        # שום סימן - נופלים חזרה ל-requirements.txt.
+        if output_format and output_format in VALID_FORMATS:
+            self.output_format = output_format
+        else:
+            self.output_format = detect_output_format(self.root)
+        print(f"[depvex][debug] output format = {self.output_format} ({output_filename(self.output_format)})")
+
+        self.lock_versions, self.lock_file_name = LockFileReader(self.root).read()
+        if self.lock_file_name:
+            print(
+                f"[depvex][debug] using pinned versions from {self.lock_file_name} "
+                f"({len(self.lock_versions)} packages)"
+            )
 
     def _index_local_modules(self, root_dir: str) -> set[str]:
 
@@ -219,6 +250,13 @@ class DependencyResolver:
         except (requests.RequestException, KeyError, TypeError, ValueError):
             return None
 
+    def get_locked_version(self, package_name: str) -> str | None:
+        """מחזיר גרסה נעולה מקובץ הלוק (אם קיים) עבור שם החבילה הנתון."""
+        if not self.lock_versions:
+            return None
+        key = LockFileReader._normalize_package_name(package_name)
+        return self.lock_versions.get(key)
+
     def resolve(self, module_name: str, has_net: bool) -> str:
         normalized_module = self._normalize_module_name(module_name)
         if not normalized_module:
@@ -242,6 +280,16 @@ class DependencyResolver:
             print(
                 f"[depvex][debug] module={normalized_module} has no mapping and is not installed; using fallback package={package_name}"
             )
+
+        # עדיפות ראשונה: גרסה נעולה מקובץ לוק (uv.lock/poetry.lock/...) -
+        # זו הכי אמינה כי היא כבר נפתרה ע"י package manager אמיתי.
+        locked_version = self.get_locked_version(package_name)
+        if locked_version:
+            print(
+                f"[depvex][debug] package={package_name} pinned via {self.lock_file_name} "
+                f"version={locked_version}"
+            )
+            return f"{package_name}=={locked_version}"
 
         version = self.get_local_version(package_name)
         if version:
@@ -451,28 +499,30 @@ class DependencyResolver:
         print(f"[depvex][debug] mapping for module={normalized} -> {result} (first candidate)")
         return result
 
+    def default_output_path(self, root: str | None = None) -> str:
+        """נתיב קובץ התלויות הראשי לפי הפורמט שנבחר/זוהה (requirements.txt כברירת מחדל)."""
+        return os.path.join(root or self.root, output_filename(self.output_format))
+
     def _read_existing_requirements(self, path: str) -> list[str]:
         if not os.path.exists(path):
             print(f"[depvex][debug] requirements file does not exist at {path}")
             return []
 
         try:
-            with open(path, "r", encoding="utf-8") as handle:
-                return [line.strip() for line in handle if line.strip() and not line.strip().startswith("#")]
+            return read_deps(path, fmt=self.output_format)
         except (OSError, UnicodeDecodeError) as exc:
             print(f"[depvex][debug] failed to read requirements file {path}: {exc}")
             return []
 
-    def write_req(self, lines: Iterable[str], path: str = "requirements.txt") -> None:
+    def write_req(self, lines: Iterable[str], path: str | None = None) -> None:
+        path = path or self.default_output_path()
         directory = os.path.dirname(path)
         if directory:
             os.makedirs(directory, exist_ok=True)
 
-        valid_lines = [line for line in lines if line]
+        valid_lines = sorted({line for line in lines if line})
         try:
-            with open(path, "w", encoding="utf-8") as handle:
-                for line in sorted(set(valid_lines)):
-                    handle.write(line + "\n")
+            write_deps(valid_lines, path, fmt=self.output_format)
         except OSError as exc:
             print(f"[depvex][debug] failed to write requirements file {path}: {exc}")
 
@@ -533,9 +583,9 @@ class DependencyResolver:
         discovered = self.discover_imports(root, exclude_dirs=exclude_dirs)
 
         if output_path is None:
-            output_path = os.path.join(root, "requirements.txt")
+            output_path = self.default_output_path(root)
 
-        requirements: list[str] = []x
+        requirements: list[str] = []
         has_net = self.internet_check()
 
         if prune_stale and os.path.exists(output_path):
@@ -579,7 +629,7 @@ class DependencyResolver:
         exclude_dirs: set[str] | None = None,
     ) -> list[str]:
         requirements = self.requirements_for(root, output_path, prune_stale, exclude_dirs)
-        self.write_req(requirements, path=output_path or os.path.join(root, "requirements.txt"))
+        self.write_req(requirements, path=output_path or self.default_output_path(root))
         return requirements
 
     def read_pyproject_dependencies(self, path: str) -> list[str]:
@@ -627,16 +677,28 @@ class DependencyResolver:
 
         for service in service_folders:
             service_root = os.path.join(root, service)
-            service_output = os.path.join(service_root, "requirements.txt")
+            service_output = self.default_output_path(service_root)
             results[service] = self._rebuild_single(service_root, service_output, prune_stale)
 
         results["__root__"] = self._rebuild_single(
             root,
-            os.path.join(root, "requirements.txt"),
+            self.default_output_path(root),
             prune_stale,
             exclude_dirs=set(service_folders),
         )
         return results
+
+    def generate_sbom(
+        self,
+        requirements: list[str],
+        output_dir: str | None = None,
+        fmt: str = "cyclonedx",
+        licenses: dict[str, str] | None = None,
+    ) -> str:
+        """מייצר SBOM (CycloneDX/SPDX) עבור רשימת requirements נתונה. מחזיר את נתיב הקובץ."""
+        output_dir = output_dir or self.root
+        project_name = os.path.basename(os.path.abspath(output_dir)) or "project"
+        return write_sbom(requirements, output_dir=output_dir, fmt=fmt, project_name=project_name, licenses=licenses)
 
     def monitor_project(self, module_list: Iterable[str], interval: int = 2) -> None:
         last_req: list[str] | None = None

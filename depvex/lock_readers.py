@@ -10,7 +10,6 @@ import json
 import os
 import re
 import tomllib
-from collections.abc import Callable
 
 
 class LockFileReader:
@@ -18,7 +17,7 @@ class LockFileReader:
 
     _NORMALIZE_RE = re.compile(r"[-_.]+")
 
-    _LOCK_FILES: tuple[tuple[str, Callable[[str], dict[str, str]]], ...] = (
+    _LOCK_FILES: tuple[tuple[str, str], ...] = (
         ("uv.lock", "_read_toml_packages"),
         ("poetry.lock", "_read_toml_packages"),
         ("Pipfile.lock", "_read_pipfile_lock"),
