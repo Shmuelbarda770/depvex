@@ -44,6 +44,57 @@ def test_imports_marked_with_ignore_comment_are_skipped() -> None:
     assert extractor.extract_imports(code) == ["flet"]
 
 
+def test_literal_dynamic_import_is_discovered() -> None:
+    extractor = ImportExtractor()
+
+    assert extractor.extract_imports('importlib.import_module("requests.sessions")') == ["requests"]
+
+
+def test_computed_dynamic_import_creates_actionable_warning(capsys: pytest.CaptureFixture[str]) -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        Path(tmpdir, "loader.py").write_text('importlib.import_module(plugin_name)\n', encoding="utf-8")
+
+        resolver = DependencyResolver(root=tmpdir)
+        assert resolver.discover_imports(tmpdir) == set()
+        resolver.print_dynamic_import_warnings()
+
+        assert "dynamic_imports" in capsys.readouterr().out
+
+
+def test_yaml_dynamic_imports_are_added_to_runtime_dependencies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "depvex.yaml").write_text("dynamic_imports:\n  - celery\n", encoding="utf-8")
+    resolver = DependencyResolver(root=str(tmp_path))
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    assert resolver.requirements_for(str(tmp_path)) == ["celery"]
+
+
+def test_test_only_imports_are_written_to_dev_optional_dependencies(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "app.py").write_text("import requests\n", encoding="utf-8")
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_app.py").write_text("import pytest\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "sample"\ndependencies = []\n', encoding="utf-8")
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    assert DepvexCLI().scan(str(tmp_path), use_pyproject=True) == 0
+    resolver = DependencyResolver(root=str(tmp_path))
+    assert resolver.read_pyproject_dependencies(str(tmp_path / "pyproject.toml")) == ["requests"]
+    assert resolver.read_pyproject_optional_dependencies(str(tmp_path / "pyproject.toml")) == ["pytest"]
+
+
+def test_diff_does_not_write_requirements(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("import requests\n", encoding="utf-8")
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+
+    assert DepvexCLI().diff(str(tmp_path)) == 1
+    assert not (tmp_path / "requirements.txt").exists()
+
+
 def test_ignore_packages_excludes_a_dependency_from_requirements() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         sample_file = Path(tmpdir) / "sample.py"

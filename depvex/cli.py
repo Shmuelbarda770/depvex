@@ -26,6 +26,9 @@ class DepvexCLI:
         commands.add_argument(
             "--report", action="store_const", const="report", dest="command", help="Report dependencies"
         )
+        commands.add_argument(
+            "--diff", action="store_const", const="diff", dest="command", help="Preview dependency changes without writing files"
+        )
         parser.add_argument("--pyproject", action="store_true", help="Also sync or check pyproject.toml dependencies")
         parser.add_argument("path", nargs="?", default=".")
         return parser
@@ -50,11 +53,11 @@ class DepvexCLI:
 
         print(Colors.colorize(f"  [{label}] requirements.txt is OUT OF DATE", Colors.YELLOW))
         for entry in missing:
-            print(f"    missing: {entry}")
+            print(Colors.colorize(f"    + missing: {entry}", Colors.GREEN))
         for entry in stale:
-            print(f"    stale: {entry}")
+            print(Colors.colorize(f"    - stale: {entry}", Colors.RED))
         for current_entry, expected_entry in changed:
-            print(f"    changed: {current_entry} -> {expected_entry}")
+            print(Colors.colorize(f"    ~ changed: {current_entry} -> {expected_entry}", Colors.YELLOW))
 
     def _check_single(
         self,
@@ -86,15 +89,38 @@ class DepvexCLI:
         self._print_difference(resolver, current, expected, label)
         return False
 
+    def _check_pyproject_dev_dependencies(
+        self, resolver: DependencyResolver, root: str, expected: list[str], label: str
+    ) -> bool:
+        """Verify the test-only ``dev`` optional-dependency group when a pyproject exists."""
+        pyproject_path = Path(root) / "pyproject.toml"
+        if not pyproject_path.exists():
+            return True
+
+        current = resolver.read_pyproject_optional_dependencies(str(pyproject_path), "dev")
+        if set(current) == set(expected):
+            return True
+
+        print(Colors.colorize(f"  [{label}] pyproject.toml optional dependency group 'dev' is OUT OF DATE", Colors.YELLOW))
+        self._print_difference(resolver, current, expected, f"{label}:dev")
+        return False
+
     def _sync_pyproject(self, resolver: DependencyResolver, root: str, dependencies: list[str]) -> None:
         pyproject_path = Path(root) / "pyproject.toml"
         if pyproject_path.exists():
             resolver.write_pyproject_dependencies(str(pyproject_path), dependencies)
             print(Colors.colorize(f"[depvex] Updated {pyproject_path}", Colors.GREEN))
 
+    def _sync_pyproject_dev_dependencies(self, resolver: DependencyResolver, root: str, dependencies: list[str]) -> None:
+        """Synchronize test-only imports into ``[project.optional-dependencies].dev``."""
+        pyproject_path = Path(root) / "pyproject.toml"
+        if pyproject_path.exists():
+            resolver.write_pyproject_optional_dependencies(str(pyproject_path), dependencies, "dev")
+            print(Colors.colorize(f"[depvex] Updated {pyproject_path} optional dependency group 'dev'", Colors.GREEN))
+
     def scan(self, path: str, use_pyproject: bool = False) -> int:
         print(Colors.colorize(f"[depvex] Starting one-time scan for {path}...", Colors.CYAN))
-        resolver = DependencyResolver()
+        resolver = DependencyResolver(root=path)
         requirements = resolver.rebuild_requirements(path)
 
         if use_pyproject:
@@ -102,8 +128,17 @@ class DepvexCLI:
                 for service, entries in requirements.items():
                     service_root = path if service == "__root__" else str(Path(path) / service)
                     self._sync_pyproject(resolver, service_root, entries)
+                    excluded_directories = set(resolver._get_active_service_folders(path)) if service == "__root__" else None
+                    dev_entries = resolver.requirements_for(
+                        service_root, exclude_dirs=excluded_directories, scope="dev"
+                    )
+                    self._sync_pyproject_dev_dependencies(resolver, service_root, dev_entries)
             else:
                 self._sync_pyproject(resolver, path, requirements)
+                dev_entries = resolver.requirements_for(path, scope="dev")
+                self._sync_pyproject_dev_dependencies(resolver, path, dev_entries)
+
+        resolver.print_dynamic_import_warnings()
 
         if isinstance(requirements, dict):
             total = sum(len(entries) for entries in requirements.values())
@@ -128,7 +163,7 @@ class DepvexCLI:
 
     def check(self, path: str, use_pyproject: bool = False) -> int:
         print(Colors.colorize(f"[depvex] Checking whether {path} is up to date...", Colors.CYAN))
-        resolver = DependencyResolver()
+        resolver = DependencyResolver(root=path)
         service_folders = resolver._get_active_service_folders(path)
         all_up_to_date = True
 
@@ -145,6 +180,8 @@ class DepvexCLI:
                 if use_pyproject:
                     expected = resolver.requirements_for(service_root, str(output_path))
                     all_up_to_date = self._check_pyproject(resolver, service_root, expected, service) and all_up_to_date
+                    expected_dev = resolver.requirements_for(service_root, scope="dev")
+                    all_up_to_date = self._check_pyproject_dev_dependencies(resolver, service_root, expected_dev, service) and all_up_to_date
 
             root_output = Path(path) / "requirements.txt"
             root_up_to_date = self._check_single(
@@ -158,6 +195,8 @@ class DepvexCLI:
             if use_pyproject:
                 expected = resolver.requirements_for(path, str(root_output), exclude_dirs=set(service_folders))
                 all_up_to_date = self._check_pyproject(resolver, path, expected, "root") and all_up_to_date
+                expected_dev = resolver.requirements_for(path, exclude_dirs=set(service_folders), scope="dev")
+                all_up_to_date = self._check_pyproject_dev_dependencies(resolver, path, expected_dev, "root") and all_up_to_date
         else:
             output_path = Path(path) / "requirements.txt"
             if not output_path.exists():
@@ -167,6 +206,10 @@ class DepvexCLI:
             if use_pyproject:
                 expected = resolver.requirements_for(path, str(output_path))
                 all_up_to_date = self._check_pyproject(resolver, path, expected, "root") and all_up_to_date
+                expected_dev = resolver.requirements_for(path, scope="dev")
+                all_up_to_date = self._check_pyproject_dev_dependencies(resolver, path, expected_dev, "root") and all_up_to_date
+
+        resolver.print_dynamic_import_warnings()
 
         if not all_up_to_date:
             print(
@@ -180,8 +223,37 @@ class DepvexCLI:
         print(Colors.colorize("[depvex] requirements.txt is already up to date.", Colors.GREEN))
         return 0
 
+    def diff(self, path: str, use_pyproject: bool = False) -> int:
+        """Print a colour-coded preview of changes that ``--scan`` would make."""
+        resolver = DependencyResolver(root=path)
+        service_folders = resolver._get_active_service_folders(path)
+        groups = [("root", path, set(service_folders) if service_folders else None)]
+        groups[:0] = [(service, str(Path(path) / service), None) for service in service_folders]
+        has_changes = False
+
+        print(Colors.colorize(f"[depvex] Dependency diff for {path}", Colors.CYAN))
+        for label, group_root, excluded_directories in groups:
+            requirements_path = Path(group_root) / "requirements.txt"
+            expected = resolver.requirements_for(group_root, str(requirements_path), exclude_dirs=excluded_directories)
+            current = resolver._read_existing_requirements(str(requirements_path))
+            if set(current) == set(expected):
+                print(Colors.colorize(f"  [{label}] requirements.txt has no changes", Colors.GREEN))
+            else:
+                self._print_difference(resolver, current, expected, label)
+                has_changes = True
+
+            if use_pyproject and (Path(group_root) / "pyproject.toml").exists():
+                current_dev = resolver.read_pyproject_optional_dependencies(str(Path(group_root) / "pyproject.toml"), "dev")
+                expected_dev = resolver.requirements_for(group_root, exclude_dirs=excluded_directories, scope="dev")
+                if set(current_dev) != set(expected_dev):
+                    self._print_difference(resolver, current_dev, expected_dev, f"{label}:dev")
+                    has_changes = True
+
+        resolver.print_dynamic_import_warnings()
+        return 1 if has_changes else 0
+
     def report(self, path: str) -> int:
-        resolver = DependencyResolver()
+        resolver = DependencyResolver(root=path)
         service_folders = resolver._get_active_service_folders(path)
         groups: dict[str, list[str]] = {}
 
@@ -220,7 +292,7 @@ class DepvexCLI:
             )
         )
 
-        resolver = DependencyResolver()
+        resolver = DependencyResolver(root=path)
         resolver.rebuild_requirements(path)
         ProjectWatcher(path, resolver=resolver).start()
 
@@ -239,6 +311,9 @@ class DepvexCLI:
 
         if args.command == "report":
             return self.report(args.path)
+
+        if args.command == "diff":
+            return self.diff(args.path, use_pyproject=args.pyproject)
 
         self.parser.print_help()
         return 1
