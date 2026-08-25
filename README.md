@@ -22,6 +22,9 @@ as pip-tools, Poetry, or uv.
 ## What it does
 
 - Parses `import` and `from ... import ...` statements with Python's AST.
+- Detects literal `importlib.import_module(...)` and `__import__(...)` calls.
+  Computed module targets, plugin loaders, and entry-point loaders produce an
+  actionable warning instead of an unsafe guess.
 - Ignores modules from the Python standard library.
 - Skips imports annotated with `# ignore depvex`.
 - Recursively scans `.py` files, excluding `.git`, `__pycache__`, `.venv`,
@@ -75,6 +78,7 @@ depvex --scan .
 depvex --check .
 depvex --watch .
 depvex --report .
+depvex --diff .
 ```
 
 | Command | Purpose | Result |
@@ -83,6 +87,7 @@ depvex --report .
 | `depvex --check [path]` | Verify scanned dependencies. | Returns `0` when current and `1` when a requirements file is missing or differs. |
 | `depvex --watch [path]` | Scan once, then watch the path. | Updates affected requirements files after the debounce delay. |
 | `depvex --report [path]` | Inspect dependency ownership. | Lists root/service dependencies and shared packages without writing files. |
+| `depvex --diff [path]` | Preview changes. | Prints colour-coded missing, stale, and changed dependencies without writing files; exits `1` when changes exist. |
 
 Add `--pyproject` to `--scan` or `--check` to sync or verify the selected
 directory's `[project].dependencies` list:
@@ -133,6 +138,11 @@ ignore_dirs:
 ignore_packages:
   - pytest
   - depvex
+
+# Dependencies loaded dynamically from configuration or plugin names.
+# These are import-module names, not pip requirement strings.
+dynamic_imports:
+  - celery
 ```
 
 Given this structure:
@@ -162,12 +172,26 @@ children of the scanned root.
 ### Configuration sources
 
 - `depvex.yaml` / `depvex.yml`: `ignore_dirs` and
-  `micro_servi_folders`, plus `ignore_packages`.
+  `micro_servi_folders`, plus `ignore_packages` and `dynamic_imports`.
 - `config.json` / `depvex.json`: `CAPTIVE_PORTAL_URLS` for the connectivity
   check and `debounce_seconds` for watch mode.
 
 The JSON `micro_servi_folders` value is not currently read for service
 discovery; use YAML for that setting.
+
+### Dynamic and development dependencies
+
+Depvex includes a dynamic import when its target is a string literal, such as
+`importlib.import_module("celery")`. If a target is computed at runtime (for
+example from a plugin or configuration value), it prints a warning with the
+file and line number. Add the module explicitly under `dynamic_imports` in
+`depvex.yaml` to include it reliably.
+
+Imports found only in conventional test paths (`tests/`, `test/`, `test_*.py`,
+`*_test.py`, and `conftest.py`) are excluded from `requirements.txt`. When
+running `--scan --pyproject`, they are synchronized to
+`[project.optional-dependencies].dev`. A dependency used in both application
+and test code remains a normal runtime dependency.
 
 ## CI usage
 

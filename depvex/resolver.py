@@ -5,6 +5,7 @@ import sys
 import time
 import tomllib
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
 from pathlib import Path
@@ -17,9 +18,30 @@ from packaging.version import Version
 IMPORT_MAPPING_FILE = Path(__file__).resolve().parent / "import_mapping_filtered.txt"
 POPULARITY_MAPPING_FILE = Path(__file__).resolve().parent / "duplicate_imports_pop.txt"
 
-from depvex.parser import ImportExtractor
+from depvex.parser import DynamicImportFinding, ImportExtractor
 from depvex.utils.read_config import project_config
 from depvex.utils.read_yaml_config import read_yaml_config
+
+
+@dataclass(frozen=True)
+class DependencyScopes:
+    """Dependencies classified by their runtime and test-only usage.
+
+    A package imported by both application and test code remains a runtime
+    dependency. ``dev_imports`` therefore contains only test-exclusive imports.
+    """
+
+    runtime_imports: set[str]
+    dev_imports: set[str]
+
+
+@dataclass(frozen=True)
+class DynamicImportWarning:
+    """A dynamic import whose module target cannot be determined statically."""
+
+    file_path: str
+    loader: str
+    line_number: int
 
 
 def _resolve_file_path(filename: str, configured_var_name: str | None = None) -> Path:
@@ -69,6 +91,12 @@ class DependencyResolver:
             for package in getattr(yaml_config, "ignore_packages", [])
             if isinstance(package, str) and self._normalize_module_name(package)
         }
+        self.DYNAMIC_IMPORTS: set[str] = {
+            self._normalize_module_name(module_name)
+            for module_name in getattr(yaml_config, "dynamic_imports", [])
+            if isinstance(module_name, str) and self._normalize_module_name(module_name)
+        }
+        self.dynamic_import_warnings: list[DynamicImportWarning] = []
 
         try:
             self.top_level_distributions = packages_distributions()
@@ -485,6 +513,15 @@ class DependencyResolver:
             print(f"[depvex][debug] failed to inspect imports for {file_path}: {exc}")
             return ()
 
+    def _get_dynamic_imports_for_file(self, file_path: str) -> tuple[DynamicImportFinding, ...]:
+        """Return runtime import-loader calls in *file_path*, without hiding parse errors."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as handle:
+                return tuple(self.parser.extract_dynamic_imports(handle.read()))
+        except (OSError, SyntaxError, UnicodeDecodeError) as exc:
+            print(f"[depvex][debug] failed to inspect dynamic imports for {file_path}: {exc}")
+            return ()
+
     @lru_cache(maxsize=512)
     def _get_imports_for_file_cached(self, cache_key: tuple[str, int]) -> tuple[str, ...]:
         file_path, _ = cache_key
@@ -499,10 +536,57 @@ class DependencyResolver:
         return [folder for folder in self.MICRO_SERVICE_FOLDERS if os.path.isdir(os.path.join(root, folder))]
 
     def discover_imports(self, root: str, exclude_dirs: set[str] | None = None) -> set[str]:
-        discovered: set[str] = set()
+        """Return runtime imports for backward-compatible callers."""
+        return self.discover_import_scopes(root, exclude_dirs).runtime_imports
+
+    def discover_import_scopes(self, root: str, exclude_dirs: set[str] | None = None) -> DependencyScopes:
+        """Discover imports and separate application imports from test-only imports."""
+        runtime_imports: set[str] = set()
+        test_imports: set[str] = set()
+        self.dynamic_import_warnings = []
+
         for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
-            discovered.update(self._get_imports_for_file(file_path))
-        return {module_name for module_name in discovered if not self._is_ignored_package(module_name)}
+            target = test_imports if self._is_test_file(file_path, root) else runtime_imports
+            target.update(self._get_imports_for_file(file_path))
+            self._record_dynamic_import_warnings(file_path)
+
+        runtime_imports.update(self.DYNAMIC_IMPORTS)
+        filtered_runtime = {module for module in runtime_imports if not self._is_ignored_package(module)}
+        filtered_dev = {
+            module
+            for module in test_imports - filtered_runtime
+            if not self._is_ignored_package(module)
+        }
+        return DependencyScopes(filtered_runtime, filtered_dev)
+
+    @staticmethod
+    def _is_test_file(file_path: str, root: str) -> bool:
+        """Identify conventional Python test files without relying on pytest."""
+        relative_path = Path(file_path).resolve().relative_to(Path(root).resolve())
+        filename = relative_path.name
+        return (
+            any(part in {"test", "tests"} for part in relative_path.parts[:-1])
+            or filename == "conftest.py"
+            or filename.startswith("test_")
+            or filename.endswith("_test.py")
+        )
+
+    def _record_dynamic_import_warnings(self, file_path: str) -> None:
+        """Store warnings for computed import targets found in *file_path*."""
+        for finding in self._get_dynamic_imports_for_file(file_path):
+            if finding.module_name is None or finding.loader in {"load_plugin", "load_entry_point"}:
+                self.dynamic_import_warnings.append(
+                    DynamicImportWarning(file_path, finding.loader, finding.line_number)
+                )
+
+    def print_dynamic_import_warnings(self) -> None:
+        """Print actionable warnings for imports that static analysis cannot resolve."""
+        for warning in self.dynamic_import_warnings:
+            print(
+                "[depvex] Warning: dynamic import target cannot be resolved "
+                f"({warning.loader} at {warning.file_path}:{warning.line_number}). "
+                "Add its module name to dynamic_imports in depvex.yaml."
+            )
 
     def _walk_python_files(self, root: str, exclude_dirs: set[str] | None = None) -> Iterator[str]:
         exclude_dirs = exclude_dirs or set()
@@ -529,8 +613,17 @@ class DependencyResolver:
         output_path: str | None = None,
         prune_stale: bool = True,
         exclude_dirs: set[str] | None = None,
+        scope: str = "runtime",
     ) -> list[str]:
-        discovered = self.discover_imports(root, exclude_dirs=exclude_dirs)
+        # Keep the runtime path behind ``discover_imports`` for public API and
+        # test-double compatibility. Development dependencies need the richer
+        # scoped result because they are intentionally test-only.
+        if scope == "runtime":
+            discovered = self.discover_imports(root, exclude_dirs=exclude_dirs)
+        elif scope == "dev":
+            discovered = self.discover_import_scopes(root, exclude_dirs=exclude_dirs).dev_imports
+        else:
+            raise ValueError("scope must be either 'runtime' or 'dev'")
 
         if output_path is None:
             output_path = os.path.join(root, "requirements.txt")
@@ -583,13 +676,22 @@ class DependencyResolver:
         return requirements
 
     def read_pyproject_dependencies(self, path: str) -> list[str]:
+        """Read runtime dependencies from the ``[project]`` table."""
+        return self._read_pyproject_dependency_list(path, "dependencies")
+
+    def read_pyproject_optional_dependencies(self, path: str, group: str = "dev") -> list[str]:
+        """Read one ``[project.optional-dependencies]`` group, such as ``dev``."""
+        return self._read_pyproject_dependency_list(path, group, optional_group=True)
+
+    @staticmethod
+    def _read_pyproject_dependency_list(path: str, key: str, optional_group: bool = False) -> list[str]:
         try:
             with open(path, "rb") as handle:
                 project = tomllib.load(handle).get("project", {})
         except (OSError, tomllib.TOMLDecodeError):
             return []
 
-        dependencies = project.get("dependencies", [])
+        dependencies = project.get("optional-dependencies", {}).get(key, []) if optional_group else project.get(key, [])
         return (
             [dependency for dependency in dependencies if isinstance(dependency, str)]
             if isinstance(dependencies, list)
@@ -597,21 +699,41 @@ class DependencyResolver:
         )
 
     def write_pyproject_dependencies(self, path: str, dependencies: Iterable[str]) -> None:
+        """Replace ``[project].dependencies`` while preserving other TOML content."""
+        self._write_pyproject_dependency_list(path, dependencies, "dependencies")
+
+    def write_pyproject_optional_dependencies(
+        self, path: str, dependencies: Iterable[str], group: str = "dev"
+    ) -> None:
+        """Replace an optional dependency group, creating its TOML table when needed."""
+        self._write_pyproject_dependency_list(path, dependencies, group, optional_group=True)
+
+    @staticmethod
+    def _write_pyproject_dependency_list(
+        path: str, dependencies: Iterable[str], key: str, optional_group: bool = False
+    ) -> None:
         with open(path, "r", encoding="utf-8") as handle:
             content = handle.read()
 
-        project_match = re.search(r"(?ms)^\[project\]\n(?P<body>.*?)(?=^\[|\Z)", content)
-        if project_match is None:
-            raise ValueError(f"{path} does not contain a [project] table")
-
         dependency_lines = "\n".join(f'    "{dependency}",' for dependency in sorted(set(dependencies)))
-        replacement = f"dependencies = [\n{dependency_lines}\n]"
-        project_body = project_match.group("body")
-        updated_body, replacements = re.subn(r"(?ms)^dependencies\s*=\s*\[.*?\]", replacement, project_body, count=1)
-        if replacements == 0:
-            updated_body = f"{project_body.rstrip()}\n\n{replacement}\n"
+        replacement = f"{key} = [\n{dependency_lines}\n]"
+        table_name = "project.optional-dependencies" if optional_group else "project"
+        table_match = re.search(rf"(?ms)^\[{re.escape(table_name)}\]\n(?P<body>.*?)(?=^\[|\Z)", content)
 
-        updated_content = f"{content[:project_match.start('body')]}{updated_body}{content[project_match.end('body'):]}"
+        if table_match is None:
+            if optional_group:
+                updated_content = f"{content.rstrip()}\n\n[{table_name}]\n{replacement}\n"
+            else:
+                raise ValueError(f"{path} does not contain a [project] table")
+        else:
+            table_body = table_match.group("body")
+            updated_body, replacements = re.subn(
+                rf"(?ms)^{re.escape(key)}\s*=\s*\[.*?\]", replacement, table_body, count=1
+            )
+            if replacements == 0:
+                updated_body = f"{table_body.rstrip()}\n\n{replacement}\n"
+            updated_content = f"{content[:table_match.start('body')]}{updated_body}{content[table_match.end('body'):]}"
+
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(updated_content)
 
