@@ -113,6 +113,10 @@ class ImportExtractor:
         """Return the supported dynamic-loader name represented by *function*."""
         if isinstance(function, ast.Name) and function.id in {"__import__", "import_module"}:
             return function.id
-        if isinstance(function, ast.Attribute) and function.attr in {"import_module", "load_plugin", "load_entry_point"}:
+        if isinstance(function, ast.Attribute) and function.attr in {
+            "import_module",
+            "load_plugin",
+            "load_entry_point",
+        }:
             return function.attr
         return None

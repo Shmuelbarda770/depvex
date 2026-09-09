@@ -52,7 +52,7 @@ def test_literal_dynamic_import_is_discovered() -> None:
 
 def test_computed_dynamic_import_creates_actionable_warning(capsys: pytest.CaptureFixture[str]) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
-        Path(tmpdir, "loader.py").write_text('importlib.import_module(plugin_name)\n', encoding="utf-8")
+        Path(tmpdir, "loader.py").write_text("importlib.import_module(plugin_name)\n", encoding="utf-8")
 
         resolver = DependencyResolver(root=tmpdir)
         assert resolver.discover_imports(tmpdir) == set()
@@ -61,7 +61,9 @@ def test_computed_dynamic_import_creates_actionable_warning(capsys: pytest.Captu
         assert "dynamic_imports" in capsys.readouterr().out
 
 
-def test_yaml_dynamic_imports_are_added_to_runtime_dependencies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_yaml_dynamic_imports_are_added_to_runtime_dependencies(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     (tmp_path / "depvex.yaml").write_text("dynamic_imports:\n  - celery\n", encoding="utf-8")
     resolver = DependencyResolver(root=str(tmp_path))
     monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
@@ -191,23 +193,13 @@ def test_type_checking_imports_are_skipped() -> None:
 
 def test_typing_attribute_type_checking_is_skipped() -> None:
     extractor = ImportExtractor()
-    code = (
-        "import typing\n"
-        "if typing.TYPE_CHECKING:\n"
-        "    import torch\n"
-        "import flet\n"
-    )
+    code = "import typing\n" "if typing.TYPE_CHECKING:\n" "    import torch\n" "import flet\n"
     assert extractor.extract_imports(code) == ["flet"]
 
 
 def test_aliased_typing_type_checking_is_skipped() -> None:
     extractor = ImportExtractor()
-    code = (
-        "import typing as t\n"
-        "if t.TYPE_CHECKING:\n"
-        "    import scipy\n"
-        "import click\n"
-    )
+    code = "import typing as t\n" "if t.TYPE_CHECKING:\n" "    import scipy\n" "import click\n"
     assert extractor.extract_imports(code) == ["click"]
 
 
@@ -252,10 +244,7 @@ def test_scan_does_not_include_type_checking_imports_in_requirements() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         sample_file = Path(tmpdir) / "sample.py"
         sample_file.write_text(
-            "from typing import TYPE_CHECKING\n"
-            "if TYPE_CHECKING:\n"
-            "    import pandas\n"
-            "import flet\n",
+            "from typing import TYPE_CHECKING\n" "if TYPE_CHECKING:\n" "    import pandas\n" "import flet\n",
             encoding="utf-8",
         )
 
@@ -268,4 +257,3 @@ def test_scan_does_not_include_type_checking_imports_in_requirements() -> None:
         lines = requirements_path.read_text(encoding="utf-8").splitlines()
         assert any(line.startswith("flet") for line in lines)
         assert not any(line.startswith("pandas") for line in lines)
-
