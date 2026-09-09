@@ -8,6 +8,7 @@ that contain multiple independently managed services.
 
 - AST-based detection of `import` and `from ... import ...` statements.
 - Standard-library filtering and per-import opt-out with `# ignore depvex`.
+- Skips imports inside `if TYPE_CHECKING:` blocks to avoid adding type-only imports.
 - Recursive Python-file discovery with built-in ignored directories and YAML
   `ignore_dirs` and `ignore_packages` support.
 - Import-module to installed-distribution mapping through `importlib.metadata`.

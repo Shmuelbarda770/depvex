@@ -552,11 +552,7 @@ class DependencyResolver:
 
         runtime_imports.update(self.DYNAMIC_IMPORTS)
         filtered_runtime = {module for module in runtime_imports if not self._is_ignored_package(module)}
-        filtered_dev = {
-            module
-            for module in test_imports - filtered_runtime
-            if not self._is_ignored_package(module)
-        }
+        filtered_dev = {module for module in test_imports - filtered_runtime if not self._is_ignored_package(module)}
         return DependencyScopes(filtered_runtime, filtered_dev)
 
     @staticmethod
@@ -702,9 +698,7 @@ class DependencyResolver:
         """Replace ``[project].dependencies`` while preserving other TOML content."""
         self._write_pyproject_dependency_list(path, dependencies, "dependencies")
 
-    def write_pyproject_optional_dependencies(
-        self, path: str, dependencies: Iterable[str], group: str = "dev"
-    ) -> None:
+    def write_pyproject_optional_dependencies(self, path: str, dependencies: Iterable[str], group: str = "dev") -> None:
         """Replace an optional dependency group, creating its TOML table when needed."""
         self._write_pyproject_dependency_list(path, dependencies, group, optional_group=True)
 

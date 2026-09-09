@@ -30,14 +30,39 @@ class ImportExtractor:
         lowered = line_text.lower()
         return "ignore depvex" in lowered
 
+    @staticmethod
+    def _is_type_checking_condition(node: ast.AST) -> bool:
+        if isinstance(node, ast.Name) and node.id == "TYPE_CHECKING":
+            return True
+        if isinstance(node, ast.Attribute) and node.attr == "TYPE_CHECKING":
+            return True
+        return False
+
+    def _get_type_checking_nodes(self, tree: ast.AST) -> set[ast.AST]:
+        type_checking_nodes: set[ast.AST] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.If):
+                if self._is_type_checking_condition(node.test):
+                    for stmt in node.body:
+                        type_checking_nodes.update(ast.walk(stmt))
+                elif (
+                    isinstance(node.test, ast.UnaryOp)
+                    and isinstance(node.test.op, ast.Not)
+                    and self._is_type_checking_condition(node.test.operand)
+                ):
+                    for stmt in node.orelse:
+                        type_checking_nodes.update(ast.walk(stmt))
+        return type_checking_nodes
+
     def extract_imports(self, code: str) -> list[str]:
         """Return third-party imports, including statically-known dynamic imports."""
         tree = ast.parse(code)
         source_lines = code.splitlines()
+        type_checking_nodes = self._get_type_checking_nodes(tree)
         imports = set()
 
         for node in ast.walk(tree):
-            if self._should_ignore(node, source_lines):
+            if node in type_checking_nodes or self._should_ignore(node, source_lines):
                 continue
 
             if isinstance(node, ast.Import):
@@ -66,10 +91,11 @@ class ImportExtractor:
         """
         parsed_tree = tree or ast.parse(code)
         source_lines = code.splitlines()
+        type_checking_nodes = self._get_type_checking_nodes(parsed_tree)
         findings: list[DynamicImportFinding] = []
 
         for node in ast.walk(parsed_tree):
-            if not isinstance(node, ast.Call) or self._should_ignore(node, source_lines):
+            if node in type_checking_nodes or not isinstance(node, ast.Call) or self._should_ignore(node, source_lines):
                 continue
 
             loader = self._dynamic_loader_name(node.func)
@@ -87,6 +113,10 @@ class ImportExtractor:
         """Return the supported dynamic-loader name represented by *function*."""
         if isinstance(function, ast.Name) and function.id in {"__import__", "import_module"}:
             return function.id
-        if isinstance(function, ast.Attribute) and function.attr in {"import_module", "load_plugin", "load_entry_point"}:
+        if isinstance(function, ast.Attribute) and function.attr in {
+            "import_module",
+            "load_plugin",
+            "load_entry_point",
+        }:
             return function.attr
         return None

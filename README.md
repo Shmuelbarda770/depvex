@@ -27,6 +27,7 @@ as pip-tools, Poetry, or uv.
   actionable warning instead of an unsafe guess.
 - Ignores modules from the Python standard library.
 - Skips imports annotated with `# ignore depvex`.
+- Skips imports inside `if TYPE_CHECKING:` and `if typing.TYPE_CHECKING:` blocks so type-only imports do not pollute production requirements.
 - Recursively scans `.py` files, excluding `.git`, `__pycache__`, `.venv`,
   `venv`, and `node_modules`.
 - Supports additional ignored directories through `depvex.yaml`.
@@ -192,6 +193,13 @@ Imports found only in conventional test paths (`tests/`, `test/`, `test_*.py`,
 running `--scan --pyproject`, they are synchronized to
 `[project.optional-dependencies].dev`. A dependency used in both application
 and test code remains a normal runtime dependency.
+
+### Type-checking imports
+
+Imports enclosed in `if TYPE_CHECKING:` or `if typing.TYPE_CHECKING:` blocks
+are skipped automatically. This prevents type-hint-only dependencies (or
+types imported solely to prevent circular dependencies) from inflating
+production `requirements.txt` files or triggering unexpected check failures.
 
 ## CI usage
 
