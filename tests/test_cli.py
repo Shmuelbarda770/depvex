@@ -175,3 +175,97 @@ def test_report_and_pyproject_flags_are_available() -> None:
 
     assert args.command == "report"
     assert args.pyproject is True
+
+
+def test_type_checking_imports_are_skipped() -> None:
+    extractor = ImportExtractor()
+    code = (
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    import pandas\n"
+        "    from sklearn import metrics\n"
+        "import requests\n"
+    )
+    assert extractor.extract_imports(code) == ["requests"]
+
+
+def test_typing_attribute_type_checking_is_skipped() -> None:
+    extractor = ImportExtractor()
+    code = (
+        "import typing\n"
+        "if typing.TYPE_CHECKING:\n"
+        "    import torch\n"
+        "import flet\n"
+    )
+    assert extractor.extract_imports(code) == ["flet"]
+
+
+def test_aliased_typing_type_checking_is_skipped() -> None:
+    extractor = ImportExtractor()
+    code = (
+        "import typing as t\n"
+        "if t.TYPE_CHECKING:\n"
+        "    import scipy\n"
+        "import click\n"
+    )
+    assert extractor.extract_imports(code) == ["click"]
+
+
+def test_not_type_checking_orelse_is_skipped() -> None:
+    extractor = ImportExtractor()
+    code = (
+        "from typing import TYPE_CHECKING\n"
+        "if not TYPE_CHECKING:\n"
+        "    import requests\n"
+        "else:\n"
+        "    import polars\n"
+    )
+    assert extractor.extract_imports(code) == ["requests"]
+
+
+def test_runtime_import_outside_type_checking_is_retained() -> None:
+    extractor = ImportExtractor()
+    code = (
+        "from typing import TYPE_CHECKING\n"
+        "import requests\n"
+        "if TYPE_CHECKING:\n"
+        "    import requests\n"
+        "    import pandas\n"
+    )
+    assert extractor.extract_imports(code) == ["requests"]
+
+
+def test_dynamic_imports_in_type_checking_are_skipped() -> None:
+    extractor = ImportExtractor()
+    code = (
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    import importlib\n"
+        "    importlib.import_module('celery')\n"
+        "    importlib.import_module(dynamic_var)\n"
+    )
+    assert extractor.extract_imports(code) == []
+    assert extractor.extract_dynamic_imports(code) == []
+
+
+def test_scan_does_not_include_type_checking_imports_in_requirements() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sample_file = Path(tmpdir) / "sample.py"
+        sample_file.write_text(
+            "from typing import TYPE_CHECKING\n"
+            "if TYPE_CHECKING:\n"
+            "    import pandas\n"
+            "import flet\n",
+            encoding="utf-8",
+        )
+
+        cli = DepvexCLI()
+        exit_code = cli.scan(tmpdir)
+
+        assert exit_code == 0
+        requirements_path = Path(tmpdir) / "requirements.txt"
+        assert requirements_path.exists()
+        lines = requirements_path.read_text(encoding="utf-8").splitlines()
+        assert any(line.startswith("flet") for line in lines)
+        assert not any(line.startswith("pandas") for line in lines)
+
