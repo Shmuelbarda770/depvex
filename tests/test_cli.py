@@ -415,3 +415,14 @@ def test_diff_detects_notebook_changes(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert DepvexCLI().diff(str(tmp_path)) == 1
     assert not (tmp_path / "requirements-notebooks.txt").exists()
 
+
+def test_version_flag_prints_version_and_exits(capsys: pytest.CaptureFixture[str]) -> None:
+    cli = DepvexCLI()
+    with pytest.raises(SystemExit) as exc_info:
+        cli.run(["--version"])
+
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert "depvex" in captured.out
+
+

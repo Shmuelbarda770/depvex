@@ -1,11 +1,19 @@
 import argparse
 import os
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from depvex.models.base_model import Colors
 from depvex.resolver import DependencyResolver
 from depvex.watcher import ProjectWatcher
+
+
+def _get_version() -> str:
+    try:
+        return version("depvex")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 class DepvexCLI:
@@ -14,6 +22,14 @@ class DepvexCLI:
 
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(prog="depvex")
+        parser.add_argument(
+            "-v",
+            "-V",
+            "--version",
+            action="version",
+            version=f"%(prog)s {_get_version()}",
+            help="Show program's version number and exit",
+        )
         commands = parser.add_mutually_exclusive_group(required=True)
         commands.add_argument(
             "--scan", action="store_const", const="scan", dest="command", help="Run a one-time dependency scan"
