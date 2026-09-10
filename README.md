@@ -28,8 +28,10 @@ as pip-tools, Poetry, or uv.
 - Ignores modules from the Python standard library.
 - Skips imports annotated with `# ignore depvex`.
 - Skips imports inside `if TYPE_CHECKING:` and `if typing.TYPE_CHECKING:` blocks so type-only imports do not pollute production requirements.
-- Recursively scans `.py` files, excluding `.git`, `__pycache__`, `.venv`,
-  `venv`, and `node_modules`.
+- Recursively scans `.py` and `.ipynb` files, excluding `.git`, `__pycache__`, `.venv`,
+  `venv`, `node_modules`, and `.ipynb_checkpoints`.
+- Automatically filters IPython magic commands (`%`, `%%`), shell commands (`!`), and help queries (`?`) when parsing Jupyter notebooks.
+- Generates `requirements-notebooks.txt` by default to isolate notebook dependencies, or merges them into `requirements.txt` when configured in `depvex.yaml`.
 - Supports additional ignored directories through `depvex.yaml`.
 - Supports `ignore_packages` in YAML, matching either an import module or its
   resolved distribution name.
@@ -200,6 +202,17 @@ Imports enclosed in `if TYPE_CHECKING:` or `if typing.TYPE_CHECKING:` blocks
 are skipped automatically. This prevents type-hint-only dependencies (or
 types imported solely to prevent circular dependencies) from inflating
 production `requirements.txt` files or triggering unexpected check failures.
+
+### Jupyter Notebooks (.ipynb)
+
+`depvex` parses Jupyter Notebooks (`.ipynb`) and extracts third-party imports while ignoring IPython magic commands (`%`, `%%`), shell commands (`!`), and interactive help queries (`?`).
+
+- **Default behavior**: When notebooks are detected, their dependencies are written to a dedicated `requirements-notebooks.txt` file at the project root. This keeps production `requirements.txt` clean from data science and exploration libraries.
+- **Merge into `requirements.txt`**: To combine all dependencies into a single file for the entire project, specify `notebooks_target` in `depvex.yaml`:
+  ```yaml
+  notebooks_target: "requirements.txt"
+  ```
+- **Custom target file**: You can also route notebook dependencies to another path (e.g. `notebooks_target: "notebooks/requirements.txt"`).
 
 ## CI usage
 

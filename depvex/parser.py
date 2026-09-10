@@ -1,4 +1,5 @@
 import ast
+import json
 import sys
 from dataclasses import dataclass
 
@@ -53,6 +54,60 @@ class ImportExtractor:
                     for stmt in node.orelse:
                         type_checking_nodes.update(ast.walk(stmt))
         return type_checking_nodes
+
+    @staticmethod
+    def extract_notebook_code(content: str) -> str:
+        """Extract executable Python code from a Jupyter Notebook JSON string.
+
+        IPython magic commands (lines starting with '%' or '%%'), shell commands
+        (lines starting with '!'), and interactive help queries (e.g. 'obj?')
+        are converted to comments so they don't produce AST syntax errors.
+        """
+        try:
+            notebook_data = json.loads(content)
+        except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
+            return ""
+
+        if not isinstance(notebook_data, dict):
+            return ""
+
+        cells = notebook_data.get("cells", [])
+        if not isinstance(cells, list):
+            return ""
+
+        code_lines: list[str] = []
+        for cell in cells:
+            if not isinstance(cell, dict) or cell.get("cell_type") != "code":
+                continue
+
+            source = cell.get("source", [])
+            if isinstance(source, str):
+                raw_lines = source.splitlines()
+            elif isinstance(source, list):
+                raw_lines = [str(line).rstrip("\r\n") for line in source]
+            else:
+                raw_lines = []
+
+            for line in raw_lines:
+                stripped = line.strip()
+                if stripped.startswith(("%", "!", "?")) or stripped.endswith("?"):
+                    code_lines.append(f"# [depvex-notebook-filter] {line}")
+                else:
+                    code_lines.append(line)
+
+            code_lines.append("")
+
+        return "\n".join(code_lines)
+
+    def extract_notebook_imports(self, content: str) -> list[str]:
+        """Extract third-party imports from a Jupyter Notebook JSON string."""
+        clean_code = self.extract_notebook_code(content)
+        if not clean_code.strip():
+            return []
+        try:
+            return self.extract_imports(clean_code)
+        except SyntaxError:
+            return []
 
     def extract_imports(self, code: str) -> list[str]:
         """Return third-party imports, including statically-known dynamic imports."""

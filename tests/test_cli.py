@@ -1,3 +1,4 @@
+import json
 import tempfile
 from pathlib import Path
 
@@ -257,3 +258,124 @@ def test_scan_does_not_include_type_checking_imports_in_requirements() -> None:
         lines = requirements_path.read_text(encoding="utf-8").splitlines()
         assert any(line.startswith("flet") for line in lines)
         assert not any(line.startswith("pandas") for line in lines)
+
+
+def test_extract_notebook_code_and_imports_with_magics() -> None:
+    extractor = ImportExtractor()
+    notebook_json = json.dumps(
+        {
+            "cells": [
+                {"cell_type": "markdown", "source": ["# Title\n", "Some text"]},
+                {
+                    "cell_type": "code",
+                    "source": ["%matplotlib inline\n", "!pip install whatever\n", "import seaborn as sns\n"],
+                },
+                {"cell_type": "code", "source": "df.info?\nfrom sklearn.cluster import KMeans\n"},
+            ]
+        }
+    )
+    imports = extractor.extract_notebook_imports(notebook_json)
+    assert sorted(imports) == ["seaborn", "sklearn"]
+
+
+def test_scan_creates_requirements_notebooks_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("import requests\n", encoding="utf-8")
+    notebook_content = json.dumps({"cells": [{"cell_type": "code", "source": ["import matplotlib\n"]}]})
+    (tmp_path / "analysis.ipynb").write_text(notebook_content, encoding="utf-8")
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    exit_code = DepvexCLI().scan(str(tmp_path))
+    assert exit_code == 0
+
+    req_path = tmp_path / "requirements.txt"
+    nb_req_path = tmp_path / "requirements-notebooks.txt"
+
+    assert req_path.exists()
+    assert nb_req_path.exists()
+
+    req_lines = req_path.read_text(encoding="utf-8").splitlines()
+    nb_lines = nb_req_path.read_text(encoding="utf-8").splitlines()
+
+    assert "requests" in req_lines
+    assert "matplotlib" not in req_lines
+    assert "matplotlib" in nb_lines
+    assert "requests" not in nb_lines
+
+
+def test_scan_merges_notebooks_when_target_is_requirements_txt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "depvex.yaml").write_text("notebooks_target: 'requirements.txt'\n", encoding="utf-8")
+    (tmp_path / "app.py").write_text("import requests\n", encoding="utf-8")
+    notebook_content = json.dumps({"cells": [{"cell_type": "code", "source": ["import matplotlib\n"]}]})
+    (tmp_path / "analysis.ipynb").write_text(notebook_content, encoding="utf-8")
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    exit_code = DepvexCLI().scan(str(tmp_path))
+    assert exit_code == 0
+
+    req_path = tmp_path / "requirements.txt"
+    nb_req_path = tmp_path / "requirements-notebooks.txt"
+
+    assert req_path.exists()
+    assert not nb_req_path.exists()
+
+    req_lines = req_path.read_text(encoding="utf-8").splitlines()
+    assert "requests" in req_lines
+    assert "matplotlib" in req_lines
+
+
+def test_scan_custom_notebooks_target(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "depvex.yaml").write_text("notebooks_target: 'custom-notebooks.txt'\n", encoding="utf-8")
+    notebook_content = json.dumps({"cells": [{"cell_type": "code", "source": ["import matplotlib\n"]}]})
+    (tmp_path / "analysis.ipynb").write_text(notebook_content, encoding="utf-8")
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    exit_code = DepvexCLI().scan(str(tmp_path))
+    assert exit_code == 0
+
+    assert (tmp_path / "custom-notebooks.txt").exists()
+    assert not (tmp_path / "requirements-notebooks.txt").exists()
+    lines = (tmp_path / "custom-notebooks.txt").read_text(encoding="utf-8").splitlines()
+    assert "matplotlib" in lines
+
+
+def test_check_fails_when_requirements_notebooks_is_missing_or_outdated(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    notebook_content = json.dumps({"cells": [{"cell_type": "code", "source": ["import matplotlib\n"]}]})
+    (tmp_path / "analysis.ipynb").write_text(notebook_content, encoding="utf-8")
+    (tmp_path / "requirements.txt").write_text("", encoding="utf-8")
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    # Missing requirements-notebooks.txt -> fails
+    assert DepvexCLI().check(str(tmp_path)) != 0
+
+    # Outdated requirements-notebooks.txt -> fails
+    (tmp_path / "requirements-notebooks.txt").write_text("old-package==1.0\n", encoding="utf-8")
+    assert DepvexCLI().check(str(tmp_path)) != 0
+
+    # Up to date requirements-notebooks.txt -> passes
+    (tmp_path / "requirements-notebooks.txt").write_text("matplotlib\n", encoding="utf-8")
+    assert DepvexCLI().check(str(tmp_path)) == 0
+
+
+def test_diff_detects_notebook_changes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    notebook_content = json.dumps({"cells": [{"cell_type": "code", "source": ["import matplotlib\n"]}]})
+    (tmp_path / "analysis.ipynb").write_text(notebook_content, encoding="utf-8")
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+
+    assert DepvexCLI().diff(str(tmp_path)) == 1
+    assert not (tmp_path / "requirements-notebooks.txt").exists()
+
+
+def test_version_flag_prints_version_and_exits(capsys: pytest.CaptureFixture[str]) -> None:
+    cli = DepvexCLI()
+    with pytest.raises(SystemExit) as exc_info:
+        cli.run(["--version"])
+
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert "depvex" in captured.out

@@ -1,10 +1,19 @@
 import argparse
+import os
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from depvex.models.base_model import Colors
 from depvex.resolver import DependencyResolver
 from depvex.watcher import ProjectWatcher
+
+
+def _get_version() -> str:
+    try:
+        return version("depvex")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 class DepvexCLI:
@@ -13,6 +22,14 @@ class DepvexCLI:
 
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(prog="depvex")
+        parser.add_argument(
+            "-v",
+            "-V",
+            "--version",
+            action="version",
+            version=f"%(prog)s {_get_version()}",
+            help="Show program's version number and exit",
+        )
         commands = parser.add_mutually_exclusive_group(required=True)
         commands.add_argument(
             "--scan", action="store_const", const="scan", dest="command", help="Run a one-time dependency scan"
@@ -70,9 +87,12 @@ class DepvexCLI:
         exclude_dirs: set[str] | None = None,
         output_path: Path | None = None,
         label: str = "root",
+        scope: str = "runtime",
     ) -> bool:
         output_path = output_path or (Path(root) / "requirements.txt")
-        expected_requirements = resolver.requirements_for(root, str(output_path), exclude_dirs=exclude_dirs)
+        expected_requirements = resolver.requirements_for(
+            root, str(output_path), exclude_dirs=exclude_dirs, scope=scope
+        )
         current_requirements = resolver._read_existing_requirements(str(output_path))
         if set(expected_requirements) == set(current_requirements):
             return True
@@ -150,6 +170,17 @@ class DepvexCLI:
 
         resolver.print_dynamic_import_warnings()
 
+        nb_requirements = resolver.rebuild_notebooks(path)
+        if nb_requirements is not None:
+            nb_target = resolver.get_notebooks_target_path(path)
+            rel_target = os.path.relpath(nb_target, path)
+            print(
+                Colors.colorize(
+                    f"[depvex] Updated {rel_target} with {len(nb_requirements)} notebook dependency entries.",
+                    Colors.GREEN,
+                )
+            )
+
         if isinstance(requirements, dict):
             total = sum(len(entries) for entries in requirements.values())
             print(
@@ -226,6 +257,23 @@ class DepvexCLI:
                     self._check_pyproject_dev_dependencies(resolver, path, expected_dev, "root") and all_up_to_date
                 )
 
+        if not resolver.should_merge_notebooks_into_runtime():
+            nb_target = resolver.get_notebooks_target_path(path)
+            if resolver.has_notebooks(path) or os.path.exists(nb_target):
+                rel_target = os.path.relpath(nb_target, path)
+                if not os.path.exists(nb_target):
+                    print(Colors.colorize(f"[depvex] No {rel_target} found. Run 'depvex scan .' first.", Colors.RED))
+                    all_up_to_date = False
+                else:
+                    nb_up_to_date = self._check_single(
+                        resolver, path, output_path=Path(nb_target), label="notebooks", scope="notebooks"
+                    )
+                    status_color = Colors.GREEN if nb_up_to_date else Colors.YELLOW
+                    status_text = "up to date" if nb_up_to_date else "OUT OF DATE"
+                    if nb_up_to_date:
+                        print(Colors.colorize(f"  [notebooks] {rel_target} is {status_text}", status_color))
+                    all_up_to_date = all_up_to_date and nb_up_to_date
+
         resolver.print_dynamic_import_warnings()
 
         if not all_up_to_date:
@@ -268,6 +316,18 @@ class DepvexCLI:
                     self._print_difference(resolver, current_dev, expected_dev, f"{label}:dev")
                     has_changes = True
 
+        if not resolver.should_merge_notebooks_into_runtime():
+            nb_target = resolver.get_notebooks_target_path(path)
+            if resolver.has_notebooks(path) or os.path.exists(nb_target):
+                expected_nb = resolver.requirements_for(path, nb_target, scope="notebooks")
+                current_nb = resolver._read_existing_requirements(nb_target)
+                rel_target = os.path.relpath(nb_target, path)
+                if set(current_nb) == set(expected_nb):
+                    print(Colors.colorize(f"  [notebooks] {rel_target} has no changes", Colors.GREEN))
+                else:
+                    self._print_difference(resolver, current_nb, expected_nb, "notebooks")
+                    has_changes = True
+
         resolver.print_dynamic_import_warnings()
         return 1 if has_changes else 0
 
@@ -285,6 +345,10 @@ class DepvexCLI:
             )
         else:
             groups["root"] = resolver.requirements_for(path, str(Path(path) / "requirements.txt"))
+
+        if not resolver.should_merge_notebooks_into_runtime() and resolver.has_notebooks(path):
+            nb_target = resolver.get_notebooks_target_path(path)
+            groups["notebooks"] = resolver.requirements_for(path, nb_target, scope="notebooks")
 
         print(Colors.colorize(f"[depvex] Dependency report for {path}", Colors.CYAN))
         for group, dependencies in groups.items():
