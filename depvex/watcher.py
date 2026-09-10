@@ -54,6 +54,7 @@ class ProjectFileHandler(FileSystemEventHandler):
         if not service_folders:
             print(f"[depvex] idle detected → full rescan after {self.debounce_seconds}s")
             self.resolver.rebuild_requirements(self.root)
+            self.resolver.rebuild_notebooks(self.root)
             return
 
         affected_services: set[str] = set()
@@ -76,9 +77,14 @@ class ProjectFileHandler(FileSystemEventHandler):
             self.resolver._rebuild_single(
                 self.root, os.path.join(self.root, "requirements.txt"), exclude_dirs=set(service_folders)
             )
+            self.resolver.rebuild_notebooks(self.root, exclude_dirs=set(service_folders))
 
     def on_modified(self, event: FileSystemEvent) -> None:
-        if event.is_directory or isinstance(event.src_path, bytes) or not event.src_path.endswith(".py"):
+        if (
+            event.is_directory
+            or isinstance(event.src_path, bytes)
+            or not (event.src_path.endswith(".py") or event.src_path.endswith(".ipynb"))
+        ):
             return
 
         with self._lock:
@@ -87,7 +93,11 @@ class ProjectFileHandler(FileSystemEventHandler):
         self._schedule_run()
 
     def on_created(self, event: FileSystemEvent) -> None:
-        if event.is_directory or isinstance(event.src_path, bytes) or not event.src_path.endswith(".py"):
+        if (
+            event.is_directory
+            or isinstance(event.src_path, bytes)
+            or not (event.src_path.endswith(".py") or event.src_path.endswith(".ipynb"))
+        ):
             return
 
         with self._lock:

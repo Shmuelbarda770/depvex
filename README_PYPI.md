@@ -9,8 +9,9 @@ that contain multiple independently managed services.
 - AST-based detection of `import` and `from ... import ...` statements.
 - Standard-library filtering and per-import opt-out with `# ignore depvex`.
 - Skips imports inside `if TYPE_CHECKING:` blocks to avoid adding type-only imports.
-- Recursive Python-file discovery with built-in ignored directories and YAML
-  `ignore_dirs` and `ignore_packages` support.
+- Recursive discovery across `.py` and Jupyter Notebook (`.ipynb`) files.
+- Automatically isolates notebook dependencies into `requirements-notebooks.txt` (or merges into `requirements.txt` via `notebooks_target`).
+- Built-in directory exclusions plus YAML `ignore_dirs` and `ignore_packages` support.
 - Import-module to installed-distribution mapping through `importlib.metadata`.
 - Version lookup from installed metadata without subprocesses, followed by an
   optional PyPI fallback.

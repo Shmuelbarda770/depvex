@@ -5,7 +5,7 @@ import sys
 import time
 import tomllib
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution, packages_distributions
 from pathlib import Path
@@ -25,7 +25,7 @@ from depvex.utils.read_yaml_config import read_yaml_config
 
 @dataclass(frozen=True)
 class DependencyScopes:
-    """Dependencies classified by their runtime and test-only usage.
+    """Dependencies classified by their runtime, test-only, and notebook usage.
 
     A package imported by both application and test code remains a runtime
     dependency. ``dev_imports`` therefore contains only test-exclusive imports.
@@ -33,6 +33,7 @@ class DependencyScopes:
 
     runtime_imports: set[str]
     dev_imports: set[str]
+    notebook_imports: set[str] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,7 @@ class DependencyResolver:
             for module_name in getattr(yaml_config, "dynamic_imports", [])
             if isinstance(module_name, str) and self._normalize_module_name(module_name)
         }
+        self.NOTEBOOKS_TARGET: str = getattr(yaml_config, "notebooks_target", "requirements-notebooks.txt")
         self.dynamic_import_warnings: list[DynamicImportWarning] = []
 
         try:
@@ -107,6 +109,17 @@ class DependencyResolver:
         self.POPULARITY_MAPPING = self._load_popularity_mapping_file()
 
         self.local_modules = self._index_local_modules(self.root)
+
+    def should_merge_notebooks_into_runtime(self) -> bool:
+        target = getattr(self, "NOTEBOOKS_TARGET", "requirements-notebooks.txt")
+        return target in {"requirements.txt", "./requirements.txt"}
+
+    def get_notebooks_target_path(self, root: str) -> str:
+        target = getattr(self, "NOTEBOOKS_TARGET", "requirements-notebooks.txt") or "requirements-notebooks.txt"
+        return os.path.join(root, target) if not os.path.isabs(target) else target
+
+    def has_notebooks(self, root: str, exclude_dirs: set[str] | None = None) -> bool:
+        return any(True for _ in self._walk_notebook_files(root, exclude_dirs=exclude_dirs))
 
     def _index_local_modules(self, root_dir: str) -> set[str]:
 
@@ -527,7 +540,10 @@ class DependencyResolver:
         file_path, _ = cache_key
         try:
             with open(file_path, "r", encoding="utf-8") as handle:
-                return tuple(self.parser.extract_imports(handle.read()))
+                content = handle.read()
+                if file_path.endswith(".ipynb"):
+                    return tuple(self.parser.extract_notebook_imports(content))
+                return tuple(self.parser.extract_imports(content))
         except (OSError, SyntaxError, UnicodeDecodeError) as exc:
             print(f"[depvex][debug] failed to parse imports from {file_path}: {exc}")
             return ()
@@ -540,9 +556,10 @@ class DependencyResolver:
         return self.discover_import_scopes(root, exclude_dirs).runtime_imports
 
     def discover_import_scopes(self, root: str, exclude_dirs: set[str] | None = None) -> DependencyScopes:
-        """Discover imports and separate application imports from test-only imports."""
+        """Discover imports and separate application imports from test-only and notebook imports."""
         runtime_imports: set[str] = set()
         test_imports: set[str] = set()
+        notebook_imports: set[str] = set()
         self.dynamic_import_warnings = []
 
         for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
@@ -550,10 +567,19 @@ class DependencyResolver:
             target.update(self._get_imports_for_file(file_path))
             self._record_dynamic_import_warnings(file_path)
 
+        for file_path in self._walk_notebook_files(root, exclude_dirs=exclude_dirs):
+            notebook_imports.update(self._get_imports_for_file(file_path))
+
         runtime_imports.update(self.DYNAMIC_IMPORTS)
+
+        if self.should_merge_notebooks_into_runtime():
+            runtime_imports.update(notebook_imports)
+            notebook_imports.clear()
+
         filtered_runtime = {module for module in runtime_imports if not self._is_ignored_package(module)}
         filtered_dev = {module for module in test_imports - filtered_runtime if not self._is_ignored_package(module)}
-        return DependencyScopes(filtered_runtime, filtered_dev)
+        filtered_notebooks = {module for module in notebook_imports if not self._is_ignored_package(module)}
+        return DependencyScopes(filtered_runtime, filtered_dev, filtered_notebooks)
 
     @staticmethod
     def _is_test_file(file_path: str, root: str) -> bool:
@@ -603,6 +629,25 @@ class DependencyResolver:
                 if filename.endswith(".py") and not filename.startswith("."):
                     yield os.path.join(dirpath, filename)
 
+    def _walk_notebook_files(self, root: str, exclude_dirs: set[str] | None = None) -> Iterator[str]:
+        exclude_dirs = exclude_dirs or set()
+        base_skip = {".git", "__pycache__", ".venv", "venv", "node_modules", ".ipynb_checkpoints"}
+        root_abs = os.path.abspath(root)
+
+        for dirpath, dirnames, filenames in os.walk(root):
+            rel_dir = os.path.relpath(dirpath, root_abs)
+
+            if os.path.abspath(dirpath) == root_abs:
+                dirnames[:] = [d for d in dirnames if d not in base_skip and d not in exclude_dirs]
+            else:
+                dirnames[:] = [d for d in dirnames if d not in base_skip]
+
+            dirnames[:] = [d for d in dirnames if not self._is_ignored_dir(d if rel_dir == "." else f"{rel_dir}/{d}")]
+
+            for filename in filenames:
+                if filename.endswith(".ipynb") and not filename.startswith("."):
+                    yield os.path.join(dirpath, filename)
+
     def requirements_for(
         self,
         root: str,
@@ -612,17 +657,22 @@ class DependencyResolver:
         scope: str = "runtime",
     ) -> list[str]:
         # Keep the runtime path behind ``discover_imports`` for public API and
-        # test-double compatibility. Development dependencies need the richer
-        # scoped result because they are intentionally test-only.
+        # test-double compatibility. Development and notebook dependencies need the richer
+        # scoped result because they are scoped.
         if scope == "runtime":
             discovered = self.discover_imports(root, exclude_dirs=exclude_dirs)
         elif scope == "dev":
             discovered = self.discover_import_scopes(root, exclude_dirs=exclude_dirs).dev_imports
+        elif scope == "notebooks":
+            discovered = self.discover_import_scopes(root, exclude_dirs=exclude_dirs).notebook_imports
         else:
-            raise ValueError("scope must be either 'runtime' or 'dev'")
+            raise ValueError("scope must be one of 'runtime', 'dev', or 'notebooks'")
 
         if output_path is None:
-            output_path = os.path.join(root, "requirements.txt")
+            if scope == "notebooks":
+                output_path = self.get_notebooks_target_path(root)
+            else:
+                output_path = os.path.join(root, "requirements.txt")
 
         requirements: list[str] = []
         has_net = self.internet_check()
@@ -753,6 +803,22 @@ class DependencyResolver:
             exclude_dirs=set(service_folders),
         )
         return results
+
+    def rebuild_notebooks(
+        self, root: str = ".", exclude_dirs: set[str] | None = None, prune_stale: bool = True
+    ) -> list[str] | None:
+        if self.should_merge_notebooks_into_runtime():
+            return None
+
+        target_path = self.get_notebooks_target_path(root)
+        if not self.has_notebooks(root, exclude_dirs=exclude_dirs) and not os.path.exists(target_path):
+            return None
+
+        requirements = self.requirements_for(
+            root, target_path, prune_stale=prune_stale, exclude_dirs=exclude_dirs, scope="notebooks"
+        )
+        self.write_req(requirements, path=target_path)
+        return requirements
 
     def monitor_project(self, module_list: Iterable[str], interval: int = 2) -> None:
         last_req: list[str] | None = None
