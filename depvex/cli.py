@@ -90,7 +90,9 @@ class DepvexCLI:
         scope: str = "runtime",
     ) -> bool:
         output_path = output_path or (Path(root) / "requirements.txt")
-        expected_requirements = resolver.requirements_for(root, str(output_path), exclude_dirs=exclude_dirs, scope=scope)
+        expected_requirements = resolver.requirements_for(
+            root, str(output_path), exclude_dirs=exclude_dirs, scope=scope
+        )
         current_requirements = resolver._read_existing_requirements(str(output_path))
         if set(expected_requirements) == set(current_requirements):
             return True

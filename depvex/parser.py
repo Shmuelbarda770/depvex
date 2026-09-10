@@ -90,10 +90,7 @@ class ImportExtractor:
 
             for line in raw_lines:
                 stripped = line.strip()
-                if (
-                    stripped.startswith(("%", "!", "?"))
-                    or stripped.endswith("?")
-                ):
+                if stripped.startswith(("%", "!", "?")) or stripped.endswith("?"):
                     code_lines.append(f"# [depvex-notebook-filter] {line}")
                 else:
                     code_lines.append(line)
