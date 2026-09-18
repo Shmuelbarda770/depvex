@@ -53,6 +53,20 @@ depvex --report .
   modified Python-file events.
 - `--report` prints dependencies per service and shared dependencies without
   changing files.
+- Multiple commands can be selected together, for example
+  `depvex --scan --check --report .`; they run sequentially by default.
+- Use `--parallel` and optionally `--jobs N` to run one command concurrently
+  across independent project paths, for example
+  `depvex --parallel --scan ./service-a ./service-b`. Use
+  `--continue-on-error` to continue sequential execution after a failed
+  command.
+- Do not combine `--parallel` with multiple commands on the same path;
+  commands such as `scan` and `check` depend on one another and must run
+  sequentially.
+- Use `--ignore-dir DIR` to add a directory exclusion from the CLI. Repeat the
+  option for multiple directories; CLI exclusions are combined with YAML
+  `ignore_dirs` values.
+- `--watch` cannot be combined with other commands because it is long-running.
 
 Use `--pyproject` with `--scan` to write, or with `--check` to verify,
 `[project].dependencies` in an existing `pyproject.toml`.

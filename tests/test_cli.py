@@ -180,6 +180,76 @@ def test_report_and_pyproject_flags_are_available() -> None:
     assert args.pyproject is True
 
 
+def test_multiple_commands_are_collected_in_cli_order() -> None:
+    args = DepvexCLI().parser.parse_args(["--scan", "--check", "--report", "."])
+
+    assert args.command == ["scan", "check", "report"]
+
+
+def test_cli_defaults_to_current_directory() -> None:
+    args = DepvexCLI().parser.parse_args(["--scan"])
+
+    assert args.paths == ["."]
+
+
+def test_cli_collects_repeatable_ignore_dirs() -> None:
+    args = DepvexCLI().parser.parse_args(["--scan", "--ignore-dir", "test_project", "--ignore-dir", "fixtures"])
+
+    assert args.ignore_dirs == ["test_project", "fixtures"]
+
+
+def test_multiple_commands_run_sequentially(monkeypatch: pytest.MonkeyPatch) -> None:
+    cli = DepvexCLI()
+    calls: list[str] = []
+
+    def fake_run(command: str, path: str, use_pyproject: bool, ignore_dirs: list[str]) -> int:
+        calls.append(command)
+        return 0
+
+    monkeypatch.setattr(cli, "_run_command", fake_run)
+
+    assert cli.run(["--scan", "--report", "."]) == 0
+    assert calls == ["scan", "report"]
+
+
+def test_parallel_commands_on_one_path_are_rejected() -> None:
+    with pytest.raises(SystemExit):
+        DepvexCLI().run(["--parallel", "--scan", "--check", "."])
+
+
+def test_parallel_scan_runs_across_multiple_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    cli = DepvexCLI()
+    calls: list[str] = []
+
+    def fake_run(command: str, path: str, use_pyproject: bool, ignore_dirs: list[str]) -> int:
+        calls.append(path)
+        return 0
+
+    monkeypatch.setattr(cli, "_run_command", fake_run)
+
+    assert cli.run(["--parallel", "--jobs", "2", "--scan", "service-a", "service-b"]) == 0
+    assert sorted(calls) == ["service-a", "service-b"]
+
+
+def test_ignore_dirs_are_passed_to_the_selected_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    cli = DepvexCLI()
+    received: list[str] = []
+
+    def fake_run(command: str, path: str, use_pyproject: bool, ignore_dirs: list[str]) -> int:
+        received.extend(ignore_dirs)
+        return 0
+
+    monkeypatch.setattr(cli, "_run_command", fake_run)
+
+    assert cli.run(["--scan", "--ignore-dir", "test_project", "."]) == 0
+    assert received == ["test_project"]
+
+
+def test_watch_cannot_be_combined_with_other_commands() -> None:
+    with pytest.raises(SystemExit):
+        DepvexCLI().run(["--watch", "--report", "."])
+
+
 def test_type_checking_imports_are_skipped() -> None:
     extractor = ImportExtractor()
     code = (
@@ -258,6 +328,20 @@ def test_scan_does_not_include_type_checking_imports_in_requirements() -> None:
         lines = requirements_path.read_text(encoding="utf-8").splitlines()
         assert any(line.startswith("flet") for line in lines)
         assert not any(line.startswith("pandas") for line in lines)
+
+
+def test_ignore_dirs_from_yaml_are_not_scanned(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "depvex.yaml").write_text("ignore_dirs:\n  - ignored\n", encoding="utf-8")
+    (tmp_path / "app.py").write_text("import requests\n", encoding="utf-8")
+    ignored_dir = tmp_path / "ignored"
+    ignored_dir.mkdir()
+    (ignored_dir / "ignored_app.py").write_text("import pandas\n", encoding="utf-8")
+
+    resolver = DependencyResolver(root=str(tmp_path))
+    monkeypatch.setattr(DependencyResolver, "internet_check", lambda self: False)
+    monkeypatch.setattr(DependencyResolver, "get_local_version", lambda self, package_name: None)
+
+    assert resolver.discover_imports(str(tmp_path)) == {"requests"}
 
 
 def test_extract_notebook_code_and_imports_with_magics() -> None:
