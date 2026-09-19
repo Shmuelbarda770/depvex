@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -14,6 +15,26 @@ def _get_version() -> str:
         return version("depvex")
     except PackageNotFoundError:
         return "unknown"
+
+
+class _CommandAction(argparse.Action):
+    """Collect repeated command flags while preserving the single-command API."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        command = self.const if self.const is not None else values
+        current = getattr(namespace, self.dest, None)
+        if current is None:
+            setattr(namespace, self.dest, command)
+        elif isinstance(current, list):
+            current.append(command)
+        else:
+            setattr(namespace, self.dest, [current, command])
 
 
 class DepvexCLI:
@@ -30,28 +51,63 @@ class DepvexCLI:
             version=f"%(prog)s {_get_version()}",
             help="Show program's version number and exit",
         )
-        commands = parser.add_mutually_exclusive_group(required=True)
-        commands.add_argument(
-            "--scan", action="store_const", const="scan", dest="command", help="Run a one-time dependency scan"
+        parser.add_argument(
+            "--scan",
+            action=_CommandAction,
+            nargs=0,
+            const="scan",
+            dest="command",
+            help="Run a one-time dependency scan",
         )
-        commands.add_argument(
-            "--check", action="store_const", const="check", dest="command", help="Check requirements.txt is up to date"
+        parser.add_argument(
+            "--check",
+            action=_CommandAction,
+            nargs=0,
+            const="check",
+            dest="command",
+            help="Check requirements.txt is up to date",
         )
-        commands.add_argument(
-            "--watch", action="store_const", const="watch", dest="command", help="Watch and update requirements.txt"
+        parser.add_argument(
+            "--watch",
+            action=_CommandAction,
+            nargs=0,
+            const="watch",
+            dest="command",
+            help="Watch and update requirements.txt",
         )
-        commands.add_argument(
-            "--report", action="store_const", const="report", dest="command", help="Report dependencies"
+        parser.add_argument(
+            "--report", action=_CommandAction, nargs=0, const="report", dest="command", help="Report dependencies"
         )
-        commands.add_argument(
+        parser.add_argument(
             "--diff",
-            action="store_const",
+            action=_CommandAction,
+            nargs=0,
             const="diff",
             dest="command",
             help="Preview dependency changes without writing files",
         )
         parser.add_argument("--pyproject", action="store_true", help="Also sync or check pyproject.toml dependencies")
-        parser.add_argument("path", nargs="?", default=".")
+        parser.add_argument(
+            "--ignore-dir",
+            action="append",
+            default=[],
+            dest="ignore_dirs",
+            metavar="DIR",
+            help="Ignore a directory while scanning (repeatable; also keeps YAML ignore_dirs)",
+        )
+        parser.add_argument("--parallel", action="store_true", help="Run selected commands concurrently")
+        parser.add_argument(
+            "--jobs", type=int, default=None, help="Maximum concurrent commands (default: number of selected commands)"
+        )
+        parser.add_argument(
+            "--continue-on-error",
+            action="store_true",
+            help="Continue running later commands after a non-zero result",
+        )
+        parser.add_argument(
+            "paths", nargs="*", default=["."], metavar="PATH", help="One or more project paths (default: .)"
+        )
+        parser.set_defaults(command=None)
         return parser
 
     def _discover_imports(
@@ -146,9 +202,9 @@ class DepvexCLI:
             resolver.write_pyproject_optional_dependencies(str(pyproject_path), dependencies, "dev")
             print(Colors.colorize(f"[depvex] Updated {pyproject_path} optional dependency group 'dev'", Colors.GREEN))
 
-    def scan(self, path: str, use_pyproject: bool = False) -> int:
+    def scan(self, path: str, use_pyproject: bool = False, ignore_dirs: list[str] | None = None) -> int:
         print(Colors.colorize(f"[depvex] Starting one-time scan for {path}...", Colors.CYAN))
-        resolver = DependencyResolver(root=path)
+        resolver = DependencyResolver(root=path, ignore_dirs=ignore_dirs)
         requirements = resolver.rebuild_requirements(path)
 
         if use_pyproject:
@@ -202,9 +258,9 @@ class DepvexCLI:
 
         return 0
 
-    def check(self, path: str, use_pyproject: bool = False) -> int:
+    def check(self, path: str, use_pyproject: bool = False, ignore_dirs: list[str] | None = None) -> int:
         print(Colors.colorize(f"[depvex] Checking whether {path} is up to date...", Colors.CYAN))
-        resolver = DependencyResolver(root=path)
+        resolver = DependencyResolver(root=path, ignore_dirs=ignore_dirs)
         service_folders = resolver._get_active_service_folders(path)
         all_up_to_date = True
 
@@ -288,9 +344,9 @@ class DepvexCLI:
         print(Colors.colorize("[depvex] requirements.txt is already up to date.", Colors.GREEN))
         return 0
 
-    def diff(self, path: str, use_pyproject: bool = False) -> int:
+    def diff(self, path: str, use_pyproject: bool = False, ignore_dirs: list[str] | None = None) -> int:
         """Print a colour-coded preview of changes that ``--scan`` would make."""
-        resolver = DependencyResolver(root=path)
+        resolver = DependencyResolver(root=path, ignore_dirs=ignore_dirs)
         service_folders = resolver._get_active_service_folders(path)
         groups = [("root", path, set(service_folders) if service_folders else None)]
         groups[:0] = [(service, str(Path(path) / service), None) for service in service_folders]
@@ -331,8 +387,8 @@ class DepvexCLI:
         resolver.print_dynamic_import_warnings()
         return 1 if has_changes else 0
 
-    def report(self, path: str) -> int:
-        resolver = DependencyResolver(root=path)
+    def report(self, path: str, ignore_dirs: list[str] | None = None) -> int:
+        resolver = DependencyResolver(root=path, ignore_dirs=ignore_dirs)
         service_folders = resolver._get_active_service_folders(path)
         groups: dict[str, list[str]] = {}
 
@@ -367,7 +423,7 @@ class DepvexCLI:
                 print(f"    {dependency}: {', '.join(sorted(dependency_groups[dependency]))}")
         return 0
 
-    def watch(self, path: str) -> None:
+    def watch(self, path: str, ignore_dirs: list[str] | None = None) -> None:
         print(Colors.colorize(f"[depvex] Starting watch mode for {path}...", Colors.CYAN))
         print(
             Colors.colorize(
@@ -375,31 +431,112 @@ class DepvexCLI:
             )
         )
 
-        resolver = DependencyResolver(root=path)
+        resolver = DependencyResolver(root=path, ignore_dirs=ignore_dirs)
         resolver.rebuild_requirements(path)
         ProjectWatcher(path, resolver=resolver).start()
 
+    def _run_command(self, command: str, path: str, use_pyproject: bool, ignore_dirs: list[str]) -> int:
+        if command == "scan":
+            return self.scan(path, use_pyproject=use_pyproject, ignore_dirs=ignore_dirs)
+        if command == "check":
+            return self.check(path, use_pyproject=use_pyproject, ignore_dirs=ignore_dirs)
+        if command == "watch":
+            self.watch(path, ignore_dirs=ignore_dirs)
+            return 0
+        if command == "report":
+            return self.report(path, ignore_dirs=ignore_dirs)
+        if command == "diff":
+            return self.diff(path, use_pyproject=use_pyproject, ignore_dirs=ignore_dirs)
+        raise ValueError(f"Unknown command: {command}")
+
+    def _run_commands(
+        self,
+        commands: list[str],
+        path: str,
+        use_pyproject: bool,
+        parallel: bool,
+        jobs: int | None,
+        continue_on_error: bool,
+        ignore_dirs: list[str],
+    ) -> int:
+        if len(commands) > 1 and parallel:
+            self.parser.error("--parallel is for independent paths; run multiple commands sequentially")
+        if "watch" in commands and len(commands) > 1:
+            self.parser.error("--watch cannot be combined with other commands")
+        if jobs is not None and jobs < 1:
+            self.parser.error("--jobs must be at least 1")
+
+        if not parallel:
+            exit_code = 0
+            for command in commands:
+                result = self._run_command(command, path, use_pyproject, ignore_dirs)
+                exit_code = max(exit_code, result)
+                if result != 0 and not continue_on_error:
+                    break
+            return exit_code
+
+        worker_count = jobs or len(commands)
+        results: list[int] = []
+        with ThreadPoolExecutor(max_workers=min(worker_count, len(commands))) as executor:
+            futures = {
+                executor.submit(self._run_command, command, path, use_pyproject, ignore_dirs): command
+                for command in commands
+            }
+            for future in as_completed(futures):
+                results.append(future.result())
+        return max(results, default=0)
+
+    def _run_on_paths(
+        self,
+        command: str,
+        paths: list[str],
+        use_pyproject: bool,
+        parallel: bool,
+        jobs: int | None,
+        ignore_dirs: list[str],
+    ) -> int:
+        if len(paths) == 1:
+            return self._run_command(command, paths[0], use_pyproject, ignore_dirs)
+        if command == "watch":
+            self.parser.error("--watch cannot be used with multiple paths")
+        if jobs is not None and jobs < 1:
+            self.parser.error("--jobs must be at least 1")
+
+        if not parallel:
+            return max(self._run_command(command, path, use_pyproject, ignore_dirs) for path in paths)
+
+        worker_count = jobs or len(paths)
+        with ThreadPoolExecutor(max_workers=min(worker_count, len(paths))) as executor:
+            futures = [executor.submit(self._run_command, command, path, use_pyproject, ignore_dirs) for path in paths]
+            return max((future.result() for future in as_completed(futures)), default=0)
+
     def run(self, argv: list[str] | None = None) -> int:
         args = self.parser.parse_args(argv or sys.argv[1:])
+        if args.command is None:
+            self.parser.error("at least one command is required")
 
-        if args.command == "scan":
-            return self.scan(args.path, use_pyproject=args.pyproject)
-
-        if args.command == "check":
-            return self.check(args.path, use_pyproject=args.pyproject)
-
-        if args.command == "watch":
-            self.watch(args.path)
-            return 0
-
-        if args.command == "report":
-            return self.report(args.path)
-
-        if args.command == "diff":
-            return self.diff(args.path, use_pyproject=args.pyproject)
-
-        self.parser.print_help()
-        return 1
+        commands = args.command if isinstance(args.command, list) else [args.command]
+        paths = args.paths
+        if len(paths) > 1 and len(commands) > 1:
+            self.parser.error("multiple paths require exactly one command")
+        if len(paths) > 1:
+            return self._run_on_paths(
+                commands[0],
+                paths,
+                use_pyproject=args.pyproject,
+                parallel=args.parallel,
+                jobs=args.jobs,
+                ignore_dirs=args.ignore_dirs,
+            )
+        return self._run_commands(
+            commands,
+            paths[0],
+            use_pyproject=args.pyproject,
+            parallel=args.parallel,
+            jobs=args.jobs,
+            continue_on_error=args.continue_on_error,
+            ignore_dirs=args.ignore_dirs,
+        )
 
     def __call__(self, argv: list[str] | None = None) -> int:
         return self.run(argv)

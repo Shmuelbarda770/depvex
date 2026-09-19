@@ -5,4 +5,5 @@ __pycache__/
 *.pyc
 *.pyd
 __pycache__/
+.DS_Store
 depvex.egg-info

@@ -79,7 +79,12 @@ class DependencyResolver:
         ["http://connectivitycheck.gstatic.com/generate_204"],
     )
 
-    def __init__(self, parser: ImportExtractor | None = None, root: str = ".") -> None:
+    def __init__(
+        self,
+        parser: ImportExtractor | None = None,
+        root: str = ".",
+        ignore_dirs: Iterable[str] | None = None,
+    ) -> None:
         self.parser = parser or ImportExtractor()
         self.root = os.path.abspath(root)
         self.python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
@@ -87,6 +92,7 @@ class DependencyResolver:
         yaml_config = read_yaml_config(start_dir=self.root)
         self.MICRO_SERVICE_FOLDERS: list[str] = getattr(yaml_config, "micro_servi_folders", [])
         self.IGNORE_DIRS: set[str] = set(getattr(yaml_config, "ignore_dirs", []))
+        self.IGNORE_DIRS.update(directory for directory in (ignore_dirs or []) if directory)
         self.IGNORE_PACKAGES: set[str] = {
             self._normalize_module_name(package)
             for package in getattr(yaml_config, "ignore_packages", [])

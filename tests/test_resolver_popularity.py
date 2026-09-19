@@ -97,3 +97,23 @@ def test_write_requirements_contains_popular_package(
         assert any(line.startswith("sap-ai-sdk-core") for line in written_content)
         assert not any(line.startswith("types-aioboto3-lite") for line in written_content)
         assert not any(line.startswith("ai-core-sdk") for line in written_content)
+
+
+def test_real_mapping_curated_resolutions() -> None:
+    with (
+        patch.object(DependencyResolver, "is_installed", return_value=False),
+        patch.object(DependencyResolver, "get_local_version", return_value=None),
+    ):
+        resolver = DependencyResolver(root=".")
+        assert resolver.resolve("cv2", has_net=False) == "opencv-python"
+        assert resolver.resolve("PIL", has_net=False) == "pillow"
+        assert resolver.resolve("PyQt6", has_net=False) == "pyqt6"
+        assert resolver.resolve("PySide6", has_net=False) == "pyside6"
+        assert resolver.resolve("aiohttp", has_net=False) == "aiohttp"
+        assert resolver.resolve("psutil", has_net=False) == "psutil"
+        assert resolver.resolve("zipp", has_net=False) == "zipp"
+        assert resolver.resolve("importlib_metadata", has_net=False) == "importlib-metadata"
+        assert resolver._mapped_package_name("tests") is None
+        assert resolver._mapped_package_name("docs") is None
+        assert resolver._mapped_package_name("tools") is None
+        assert resolver._mapped_package_name("images") is None

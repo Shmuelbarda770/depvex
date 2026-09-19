@@ -84,6 +84,30 @@ depvex --report .
 depvex --diff .
 ```
 
+Multiple commands can be selected in one invocation. They run in the order
+listed by default, and the process returns the highest exit code encountered:
+
+```bash
+depvex --scan --check --report .
+```
+
+Use `--parallel` to run one command concurrently across independent project
+paths, and `--jobs` to limit the number of workers. Use
+`--continue-on-error` to keep sequential execution going after a failed
+command. `--watch` is intentionally exclusive because it is a long-running
+command:
+
+```bash
+depvex --parallel --jobs 3 --scan ./service-a ./service-b
+depvex --scan --check --continue-on-error .
+depvex --scan --ignore-dir test_project .
+```
+
+Do not combine `--parallel` with multiple commands on the same path; commands
+such as `scan` and `check` depend on one another and must run sequentially.
+Use `--ignore-dir DIR` more than once to add CLI-only exclusions; these are
+combined with `ignore_dirs` from `depvex.yaml`.
+
 | Command | Purpose | Result |
 | --- | --- | --- |
 | `depvex --scan [path]` | Scan once. | Creates or updates requirements files. |
@@ -91,6 +115,8 @@ depvex --diff .
 | `depvex --watch [path]` | Scan once, then watch the path. | Updates affected requirements files after the debounce delay. |
 | `depvex --report [path]` | Inspect dependency ownership. | Lists root/service dependencies and shared packages without writing files. |
 | `depvex --diff [path]` | Preview changes. | Prints colour-coded missing, stale, and changed dependencies without writing files; exits `1` when changes exist. |
+
+`-v`, `-V`, and `--version` continue to print the installed version.
 
 Add `--pyproject` to `--scan` or `--check` to sync or verify the selected
 directory's `[project].dependencies` list:
