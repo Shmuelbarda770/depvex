@@ -20,7 +20,13 @@ def _get_version() -> str:
 class _CommandAction(argparse.Action):
     """Collect repeated command flags while preserving the single-command API."""
 
-    def __call__(self, parser, namespace, values, option_string=None) -> None:
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
         command = self.const if self.const is not None else values
         current = getattr(namespace, self.dest, None)
         if current is None:
@@ -46,13 +52,28 @@ class DepvexCLI:
             help="Show program's version number and exit",
         )
         parser.add_argument(
-            "--scan", action=_CommandAction, nargs=0, const="scan", dest="command", help="Run a one-time dependency scan"
+            "--scan",
+            action=_CommandAction,
+            nargs=0,
+            const="scan",
+            dest="command",
+            help="Run a one-time dependency scan",
         )
         parser.add_argument(
-            "--check", action=_CommandAction, nargs=0, const="check", dest="command", help="Check requirements.txt is up to date"
+            "--check",
+            action=_CommandAction,
+            nargs=0,
+            const="check",
+            dest="command",
+            help="Check requirements.txt is up to date",
         )
         parser.add_argument(
-            "--watch", action=_CommandAction, nargs=0, const="watch", dest="command", help="Watch and update requirements.txt"
+            "--watch",
+            action=_CommandAction,
+            nargs=0,
+            const="watch",
+            dest="command",
+            help="Watch and update requirements.txt",
         )
         parser.add_argument(
             "--report", action=_CommandAction, nargs=0, const="report", dest="command", help="Report dependencies"
