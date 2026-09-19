@@ -1,93 +1,3 @@
-.:
-    ibm-watsonx-orchestrate-clients | downloads: 224,412
-    ibm-watsonx-orchestrate-core | downloads: 224,401
-
-Cheetah:
-    ct3 | downloads: 1,658,617
-    cheetah3 | downloads: 313,420
-
-ET_Client:
-    salesforce-fuelsdk-sans | downloads: 666,917
-    salesforce-fuelsdk | downloads: 82,174
-
-FuelSDK:
-    salesforce-fuelsdk-sans | downloads: 666,917
-    salesforce-fuelsdk | downloads: 82,174
-
-Levenshtein:
-    levenshtein | downloads: 21,050,509
-    python-levenshtein-wheels | downloads: 45,447
-
-MeCab:
-    mecab-python3 | downloads: 1,043,843
-    mecab | downloads: 535,385
-
-Products:
-    zope | downloads: 119,240
-    products-cmfcore | downloads: 46,557
-    products-zcatalog | downloads: 44,723
-    products-genericsetup | downloads: 43,667
-
-PyFunceble:
-    pyfunceble-process-manager | downloads: 105,018
-    pyfunceble-dev | downloads: 103,155
-
-PyObjCTools:
-    pyobjc-framework-cocoa | downloads: 2,716,602
-    pyobjc-framework-exceptionhandling | downloads: 625,429
-
-PyQt5:
-    pyqt5 | downloads: 3,467,660
-    pyqt5-qt5 | downloads: 3,355,718
-    pyqt5-sip | downloads: 3,346,441
-    pyqtwebengine | downloads: 292,822
-    pyqtwebengine-qt5 | downloads: 286,781
-
-PyQt6:
-    pyqt6-qt6 | downloads: 2,644,020
-    pyqt6 | downloads: 2,628,994
-    pyqt6-sip | downloads: 2,611,829
-    pyqt6-webengine-qt6 | downloads: 234,952
-    pyqt6-webengine | downloads: 229,600
-
-PySide6:
-    pyside6-essentials | downloads: 3,851,432
-    pyside6-addons | downloads: 3,707,970
-    pyside6 | downloads: 3,644,067
-
-QtCore:
-    pyside2 | downloads: 150,857
-    shiboken2 | downloads: 117,465
-
-RPA:
-    rpaframework | downloads: 701,783
-    rpaframework-core | downloads: 557,312
-    rpaframework-pdf | downloads: 540,763
-
-Shiboken:
-    pyside6-essentials | downloads: 3,851,432
-    shiboken6 | downloads: 3,800,583
-
-TTS:
-    coqui-tts | downloads: 177,002
-    tts | downloads: 98,129
-
-Xlib:
-    python-xlib | downloads: 3,386,607
-    python3-xlib | downloads: 1,725,861
-    xlib | downloads: 150,879
-
-__init__:
-    jsonnet | downloads: 1,982,070
-    rev-ai | downloads: 354,131
-    slackify-markdown | downloads: 313,216
-    mmgp | downloads: 164,943
-    sagemaker-experiments | downloads: 119,457
-    csvsort | downloads: 114,584
-    owlready2 | downloads: 93,204
-    aws-cron-expression-validator | downloads: 72,182
-    python-ssl-checker | downloads: 19,167
-
 _binding:
     tree-sitter-bash | downloads: 25,362,907
     tree-sitter-javascript | downloads: 25,214,480
@@ -162,24 +72,16 @@ agent_framework:
     agent-framework-lab | downloads: 274,390
 
 ai_api_client_sdk:
-    sap-ai-sdk-base | downloads: 199,525
+    sap-ai-sdk-base | downloads: 1,199,525
     ai-api-client-sdk | downloads: 181,323
 
 ai_core_sdk:
-    sap-ai-sdk-core | downloads: 200,864
+    sap-ai-sdk-core | downloads: 1,200,864
     ai-core-sdk | downloads: 179,836
 
 ai_edge_litert:
     ai-edge-litert | downloads: 960,646
     ai-edge-litert-nightly | downloads: 50,076
-
-aioboto3-stubs:
-    types-aioboto3 | downloads: 6,048,527
-    types-aioboto3-lite | downloads: 73,411
-
-aiobotocore-stubs:
-    types-aiobotocore | downloads: 9,652,164
-    types-aiobotocore-lite | downloads: 182,780
 
 airbyte_protocol:
     airbyte-protocol-models-pdv2 | downloads: 287,654
@@ -305,10 +207,6 @@ amazon:
     amazon-ion | downloads: 21,283,362
     aws-opentelemetry-distro | downloads: 3,249,760
 
-analytics:
-    analytics-python | downloads: 1,676,821
-    teradataml | downloads: 468,167
-
 ansys:
     ansys-tools-common | downloads: 275,236
     ansys-api-platform-instancemanagement | downloads: 184,779
@@ -346,17 +244,8 @@ aspy:
     aspy-yaml | downloads: 161,841
     aspy-refactor-imports | downloads: 119,303
 
-async_timeout:
-    async-timeout | downloads: 168,019,066
-    ray | downloads: 63,016,856
-
 attr:
-    attrs | downloads: 914,833,695
-    pex | downloads: 6,067,533
-    scancode-toolkit | downloads: 113,923
-
-attrs:
-    pex | downloads: 6,067,533
+    attrs | downloads: 915,833,695
     scancode-toolkit | downloads: 113,923
 
 autogluon:
@@ -685,7 +574,6 @@ azureml:
     azureml-ai-monitoring | downloads: 56,517
 
 backports:
-    setuptools | downloads: 1,528,671,687
     backports-zstd | downloads: 76,672,494
     backports-tarfile | downloads: 71,108,501
     backports-asyncio-runner | downloads: 23,966,219
@@ -704,49 +592,9 @@ backports:
     backports-csv | downloads: 144,122
     backports-ssl | downloads: 99,127
 
-base:
-    cvxopt | downloads: 1,210,334
-    owlready2 | downloads: 93,204
-
 bench:
     aioesphomeapi | downloads: 733,281
     frappe-bench | downloads: 656,793
-
-benchmark:
-    lime | downloads: 415,227
-    jsonslicer | downloads: 298,942
-    rectangle-packer | downloads: 186,443
-    fastdigest | downloads: 99,816
-    gpflow | downloads: 70,699
-
-benchmarks:
-    pipenv | downloads: 25,768,760
-    pysbd | downloads: 5,878,989
-    pyodps | downloads: 5,362,239
-    torchrl | downloads: 1,240,022
-    pynvvideocodec | downloads: 952,565
-    enlighten | downloads: 888,952
-    fairscale | downloads: 510,176
-    xdsl | downloads: 494,942
-    async-substrate-interface | downloads: 272,894
-    scikit-learn-extra | downloads: 248,344
-    cchecksum | downloads: 244,214
-    arcticdb | downloads: 224,158
-    cyscale | downloads: 196,688
-    opacus | downloads: 167,038
-    pgi | downloads: 90,342
-
-bin:
-    pyodps | downloads: 5,362,239
-    rouge | downloads: 890,348
-    awsebcli | downloads: 351,515
-    pygwalker | downloads: 269,312
-    tosa-tools | downloads: 205,559
-    theano-pymc | downloads: 181,262
-    rouge-metric | downloads: 143,307
-    lcm | downloads: 125,250
-    theano | downloads: 100,529
-    rouge-chinese | downloads: 81,423
 
 binance:
     python-binance | downloads: 618,743
@@ -762,22 +610,22 @@ botframework:
     botframework-connector | downloads: 1,270,662
     botframework-streaming | downloads: 1,206,314
 
-boto3-stubs:
-    types-boto3 | downloads: 9,934,108
-    boto3-stubs-lite | downloads: 618,505
-
 boto3_type_annotations:
     boto3-type-annotations | downloads: 2,288,404
     boto3-type-annotations-with-docs | downloads: 119,160
 
 box_sdk_gen:
+    box-sdk-gen | downloads: 5,526,711
     boxsdk | downloads: 4,526,711
-    box-sdk-gen | downloads: 1,101,953
 
 braket:
     amazon-braket-default-simulator | downloads: 149,520
     amazon-braket-sdk | downloads: 121,196
     amazon-braket-schemas | downloads: 107,048
+
+brotli:
+    brotli | downloads: 1,000
+    brotlipy | downloads: 1,000
 
 buf:
     authzed | downloads: 955,950
@@ -786,37 +634,9 @@ buf:
     flyteidl2 | downloads: 209,143
     corvic-engine | downloads: 31,504
 
-build:
-    types-awscrt | downloads: 55,229,550
-    pyodps | downloads: 5,362,239
-    palettable | downloads: 2,626,453
-    torchrl | downloads: 1,240,022
-    botorch | downloads: 911,729
-    clevercsv | downloads: 423,013
-    ada-url | downloads: 416,101
-    pyiqa | downloads: 397,996
-    mlx-whisper | downloads: 369,833
-    crosshair-tool | downloads: 368,105
-    proces | downloads: 281,428
-    sslpsk-pmd3 | downloads: 274,196
-    biom-format | downloads: 119,374
-    python-irodsclient | downloads: 110,678
-    django-more-admin-filters | downloads: 101,324
-    ncls | downloads: 85,729
-    torch-directml | downloads: 84,428
-    qrdet | downloads: 79,902
-    imagededup | downloads: 71,201
-
 build_backend:
     flashinfer-python | downloads: 4,960,415
     torch-c-dlpack-ext | downloads: 4,848,024
-
-build_tools:
-    scikit-base | downloads: 2,434,560
-    sktime | downloads: 1,107,904
-    pykalman | downloads: 243,723
-    skpro | downloads: 168,657
-    plugp100 | downloads: 123,647
 
 bumpversion:
     bump2version | downloads: 1,905,030
@@ -826,9 +646,9 @@ cassandra:
     cassandra-driver | downloads: 8,184,241
     scylla-driver | downloads: 807,357
 
-cel:
-    xds-protos | downloads: 611,224
-    common-expression-language | downloads: 120,275
+Cheetah:
+    ct3 | downloads: 1,658,617
+    cheetah3 | downloads: 313,420
 
 chip:
     home-assistant-chip-clusters | downloads: 141,414
@@ -838,12 +658,6 @@ chtoolset:
     clickhouse-toolset | downloads: 184,249
     tinybird-toolset | downloads: 144,860
 
-ci:
-    edgegrid-python | downloads: 829,304
-    dask-cuda | downloads: 263,836
-    biom-format | downloads: 119,374
-    xarray-datatree | downloads: 68,237
-
 cid:
     py-cid | downloads: 166,610
     django-cid | downloads: 103,979
@@ -851,14 +665,6 @@ cid:
 class_registry:
     phx-class-registry | downloads: 151,335
     class-registry | downloads: 42,540
-
-cli:
-    python-hcl2 | downloads: 6,478,997
-    hermes-agent | downloads: 534,932
-    nutter | downloads: 418,428
-    mcpforunityserver | downloads: 265,705
-    dynamo-json | downloads: 102,531
-    vllm-sr | downloads: 18,233
 
 clip:
     openai-clip | downloads: 345,405
@@ -877,64 +683,19 @@ codex_plugin_scanner:
     hol-guard | downloads: 63,816
     plugin-scanner | downloads: 33,591
 
-colors:
-    ansicolors | downloads: 12,971,950
-    pex | downloads: 6,067,533
-
 com:
     spark-nlp | downloads: 1,114,155
     pyspark-hnsw | downloads: 676,198
     vmware-vcenter | downloads: 153,530
     vmware-vapi-common-client | downloads: 152,913
 
-common:
-    teradataml | downloads: 468,167
-    nutter | downloads: 418,428
-
-confluent_kafka-stubs:
-    types-confluent-kafka | downloads: 1,681,400
-    confluent-kafka-stubs | downloads: 1,114,589
-
 conftest:
     pandas-datareader | downloads: 1,370,871
     ploomber-core | downloads: 155,438
 
-consul/__init__:
-    python-consul | downloads: 1,899,062
-    py-consul | downloads: 1,207,957
-    python-consul2 | downloads: 105,870
-
-consul/aio:
-    python-consul | downloads: 1,899,062
-    py-consul | downloads: 1,207,957
-    python-consul2 | downloads: 105,870
-
-consul/base:
-    python-consul | downloads: 1,899,062
-    py-consul | downloads: 1,207,957
-    python-consul2 | downloads: 105,870
-
-consul/std:
-    python-consul | downloads: 1,899,062
-    py-consul | downloads: 1,207,957
-    python-consul2 | downloads: 105,870
-
-consul/tornado:
-    python-consul | downloads: 1,899,062
-    python-consul2 | downloads: 105,870
-
-consul/twisted:
-    python-consul | downloads: 1,899,062
-    python-consul2 | downloads: 105,870
-
 copier_templates_extensions:
     copier-template-extensions | downloads: 170,281
     copier-templates-extensions | downloads: 124,094
-
-core:
-    mcpforunityserver | downloads: 265,705
-    workspace-mcp | downloads: 250,263
-    dbl-sat-sdk | downloads: 78,362
 
 cpp:
     saxonche | downloads: 1,118,432
@@ -967,7 +728,7 @@ cuquantum:
     cudensitymat-cu13 | downloads: 77,531
 
 cv2:
-    opencv-python | downloads: 56,320,811
+    opencv-python | downloads: 57,320,811
     opencv-python-headless | downloads: 48,570,353
     opencv-contrib-python | downloads: 9,663,478
     opencv-contrib-python-headless | downloads: 2,895,915
@@ -975,10 +736,6 @@ cv2:
 dashboard:
     prowler | downloads: 202,268
     clawmetry | downloads: 51,853
-
-data:
-    open-webui | downloads: 926,196
-    teradataml | downloads: 468,167
 
 data_designer:
     data-designer | downloads: 365,820
@@ -1042,10 +799,6 @@ delta:
     databricks-connect | downloads: 11,892,750
     quill-delta | downloads: 100,134
 
-demo:
-    palettable | downloads: 2,626,453
-    aiohttp-security | downloads: 53,365
-
 detect_secrets:
     detect-secrets | downloads: 7,300,123
     bc-detect-secrets | downloads: 5,378,986
@@ -1075,60 +828,10 @@ dissect:
     dissect-fat | downloads: 50,959
     dissect-fve | downloads: 42,815
 
-dist:
-    types-awscrt | downloads: 55,229,550
-    boto3-stubs | downloads: 47,572,871
-    types-boto3 | downloads: 9,934,108
-    types-aiobotocore | downloads: 9,652,164
-    casbin | downloads: 2,881,005
-    palettable | downloads: 2,626,453
-    bullmq | downloads: 2,448,241
-    pycasbin | downloads: 2,173,039
-    speechbrain | downloads: 1,854,971
-    types-boto3-full | downloads: 1,606,284
-    pandas-datareader | downloads: 1,370,871
-    cadquery-ocp | downloads: 1,330,126
-    fakesnow | downloads: 1,271,548
-    botorch | downloads: 911,729
-    boto3-stubs-full | downloads: 764,664
-    prefect-dbt | downloads: 735,435
-    scann | downloads: 663,526
-    boto3-stubs-lite | downloads: 618,505
-    dsnparse | downloads: 462,425
-    pyiqa | downloads: 397,996
-    mlx-whisper | downloads: 369,833
-    pennylane | downloads: 307,416
-    technical | downloads: 287,236
-    proces | downloads: 281,428
-    sslpsk-pmd3 | downloads: 274,196
-    async-substrate-interface | downloads: 272,894
-    cel-expr-python | downloads: 260,904
-    types-aiobotocore-full | downloads: 257,133
-    odoo-test-helper | downloads: 229,480
-    identity | downloads: 211,169
-    ax-platform | downloads: 189,115
-    linode-api4 | downloads: 184,209
-    types-aiobotocore-lite | downloads: 182,780
-    dask-cudf-cu12 | downloads: 172,168
-    onelogin | downloads: 157,556
-    distributed-ucxx-cu12 | downloads: 149,717
-    django-cms | downloads: 128,904
-    garmin-fit-sdk | downloads: 128,279
-    casbin-async-sqlalchemy-adapter | downloads: 128,208
-    lightning-sdk | downloads: 102,095
-    django-more-admin-filters | downloads: 101,324
-    xarray-datatree | downloads: 68,237
-    tensordict-nightly | downloads: 51,098
-    metar-taf-parser-mivek | downloads: 47,711
-
 django_cryptography:
     django-cryptography-django5 | downloads: 340,362
     django-cryptography | downloads: 186,004
     django-cryptography-5 | downloads: 122,480
-
-django_filters-stubs:
-    django-filter-stubs | downloads: 273,895
-    types-django-filter | downloads: 126,616
 
 django_fsm:
     django-fsm | downloads: 546,048
@@ -1142,99 +845,16 @@ djcelery_email:
     django-celery-email | downloads: 233,149
     django-celery-email-reboot | downloads: 63,061
 
-doc:
-    azure-cosmosdb-table | downloads: 2,687,419
-    crosshair-tool | downloads: 368,105
-    pytd | downloads: 338,969
-    pennylane | downloads: 307,416
-    joblibspark | downloads: 284,341
-    pykalman | downloads: 243,723
-    mdanalysis | downloads: 222,800
-    pydocumentdb | downloads: 216,357
-    neomodel | downloads: 210,935
-    biom-format | downloads: 119,374
-
-docs:
-    google-cloud-audit-log | downloads: 48,309,608
-    aiomysql | downloads: 16,164,692
-    prance | downloads: 6,080,525
-    pyodps | downloads: 5,362,239
-    python-barcode | downloads: 2,988,212
-    einx | downloads: 2,664,157
-    palettable | downloads: 2,626,453
-    scikit-base | downloads: 2,434,560
-    unleashclient | downloads: 2,298,836
-    aws-sam-cli | downloads: 2,273,959
-    ibm-watsonx-ai | downloads: 2,272,346
-    speechbrain | downloads: 1,854,971
-    pandas-datareader | downloads: 1,370,871
-    esp-idf-kconfig | downloads: 1,327,393
-    py-consul | downloads: 1,207,957
-    sktime | downloads: 1,107,904
-    google-cloud-access-context-manager | downloads: 1,096,096
-    botorch | downloads: 911,729
-    django-tenants | downloads: 875,856
-    pgmpy | downloads: 868,351
-    pydoclint | downloads: 722,862
-    feast | downloads: 665,997
-    forex-python | downloads: 519,508
-    xdsl | downloads: 494,942
-    pyrad | downloads: 483,796
-    mlforecast | downloads: 479,562
-    serpapi | downloads: 474,339
-    e3nn | downloads: 456,674
-    phonemizer | downloads: 448,444
-    clevercsv | downloads: 423,013
-    ada-url | downloads: 416,101
-    pyiqa | downloads: 397,996
-    pytorch-forecasting | downloads: 320,460
-    technical | downloads: 287,236
-    django-pipeline | downloads: 251,873
-    snowfakery | downloads: 245,581
-    dm-haiku | downloads: 240,424
-    udapi | downloads: 233,206
-    blackjax | downloads: 226,703
-    busypie | downloads: 224,147
-    identity | downloads: 211,169
-    cyscale | downloads: 196,688
-    learnosity-sdk | downloads: 193,551
-    pyportfolioopt | downloads: 193,072
-    ax-platform | downloads: 189,115
-    linode-api4 | downloads: 184,209
-    gwcs | downloads: 178,321
-    skpro | downloads: 168,657
-    behavex | downloads: 167,318
-    sphinxcontrib-katex | downloads: 156,573
-    rax | downloads: 151,834
-    fuzzyfinder | downloads: 143,945
-    pynrrd | downloads: 138,188
-    edx-drf-extensions | downloads: 136,420
-    django-cms | downloads: 128,904
-    pytest-operator | downloads: 124,578
-    microsoft-agents-a365-runtime | downloads: 113,985
-    pybatfish | downloads: 109,543
-    ofxtools | downloads: 100,975
-    audeer | downloads: 96,117
-    audmath | downloads: 90,478
-    jraph | downloads: 86,394
-    torch-directml | downloads: 84,428
-    netcal | downloads: 84,033
-    django-session-security | downloads: 72,155
-    pyranges | downloads: 68,998
-    django-user-accounts | downloads: 63,314
-    neuro-san | downloads: 34,103
-    microsoft-agents-a365-observability-core | downloads: 107,722
-
 docstring_parser:
     docstring-parser | downloads: 274,002,564
     docstring-parser-fork | downloads: 1,149,194
 
 docx:
-    python-docx | downloads: 111,482,734
+    python-docx | downloads: 112,482,734
     python-docx-ml6 | downloads: 139,457
 
 dotenv:
-    python-dotenv | downloads: 753,905,737
+    python-dotenv | downloads: 754,905,737
     django-dotenv | downloads: 217,149
 
 dummy:
@@ -1261,13 +881,13 @@ ecmwf:
     ecmwf-datastores-client | downloads: 528,754
     ecmwf-opendata | downloads: 220,436
 
-editor:
-    python-editor | downloads: 2,808,387
-    owlready2 | downloads: 93,204
-
 environ:
     django-environ | downloads: 8,208,049
     environ-config | downloads: 183,265
+
+ET_Client:
+    salesforce-fuelsdk-sans | downloads: 666,917
+    salesforce-fuelsdk | downloads: 82,174
 
 eth:
     py-evm | downloads: 282,066
@@ -1277,88 +897,9 @@ eth_utils:
     eth-utils | downloads: 7,372,024
     faster-eth-utils | downloads: 193,151
 
-example:
-    nvidia-ml-py | downloads: 20,614,820
-    spark-parser | downloads: 492,457
-    webrtcvad | downloads: 487,021
-    pyrad | downloads: 483,796
-    clevercsv | downloads: 423,013
-    python-nmap | downloads: 285,522
-    persisting-theory | downloads: 167,325
-    pygerrit2 | downloads: 163,679
-    devcycle-python-server-sdk | downloads: 150,177
-    django-nested-inline | downloads: 82,461
-    amundsen-databuilder | downloads: 53,509
-
-examples:
-    google-ads | downloads: 36,050,633
-    aiomysql | downloads: 16,164,692
-    pysbd | downloads: 5,878,989
-    pyodps | downloads: 5,362,239
-    casbin | downloads: 2,881,005
-    dash-bootstrap-components | downloads: 2,622,105
-    pycasbin | downloads: 2,173,039
-    pymatgen-io-validation | downloads: 1,784,470
-    nemo-toolkit | downloads: 1,601,066
-    sktime | downloads: 1,107,904
-    django-tenants | downloads: 875,856
-    edgegrid-python | downloads: 829,304
-    draccus | downloads: 800,845
-    py-clob-client-v2 | downloads: 715,231
-    ir-datasets | downloads: 690,438
-    noiseprotocol | downloads: 612,695
-    progressbar | downloads: 499,399
-    e3nn | downloads: 456,674
-    xgboost-ray | downloads: 427,395
-    tf2onnx | downloads: 381,485
-    faust-streaming | downloads: 346,844
-    pytorch-forecasting | downloads: 320,460
-    fleet-python | downloads: 296,759
-    progressbar33 | downloads: 295,611
-    dask-cuda | downloads: 263,836
-    pykalman | downloads: 243,723
-    dm-haiku | downloads: 240,424
-    pingparsing | downloads: 232,825
-    lib4sbom | downloads: 229,723
-    fastapi-cloudevents | downloads: 205,461
-    easypost | downloads: 194,544
-    petastorm | downloads: 187,932
-    linode-api4 | downloads: 184,209
-    binance-connector | downloads: 170,933
-    pytoniq-core-fork | downloads: 168,954
-    skpro | downloads: 168,657
-    opacus | downloads: 167,038
-    koyeb-sdk | downloads: 166,606
-    rax | downloads: 151,834
-    paddle-python-sdk | downloads: 137,765
-    biom-format | downloads: 119,374
-    meteomatics | downloads: 114,712
-    bdbag | downloads: 112,566
-    pyfunceble-process-manager | downloads: 105,018
-    ncls | downloads: 85,729
-    netcal | downloads: 84,033
-    quantile-forest | downloads: 72,756
-    tiledb | downloads: 71,263
-    imagededup | downloads: 71,201
-    playback-studio | downloads: 64,834
-    torchscale | downloads: 33,208
-    torchmonarch | downloads: 21,493
-
 exasol:
     pyexasol | downloads: 4,937,940
     exasol-error-reporting | downloads: 161,149
-
-extension_templates:
-    sktime | downloads: 1,107,904
-    pytorch-forecasting | downloads: 320,460
-    skpro | downloads: 168,657
-
-ez_setup:
-    py-ubjson | downloads: 1,412,597
-    pyhwp | downloads: 323,146
-    pybedtools | downloads: 112,879
-    ete3 | downloads: 95,052
-    email | downloads: 75,157
 
 fabric:
     fabric-analytics-notebook-plugin | downloads: 669,137
@@ -1367,7 +908,7 @@ fabric:
     fab-classic | downloads: 107,578
 
 faiss:
-    faiss-cpu | downloads: 16,144,952
+    faiss-cpu | downloads: 17,144,952
     faiss-gpu | downloads: 310,567
     faiss-gpu-cu12 | downloads: 205,623
 
@@ -1407,7 +948,7 @@ firebird:
     firebird-driver | downloads: 166,696
 
 fitz:
-    pymupdf | downloads: 103,512,877
+    pymupdf | downloads: 104,512,877
     pymupdf-stubs | downloads: 119,251
 
 fla:
@@ -1445,6 +986,10 @@ forge:
     ngcsdk | downloads: 292,132
     python-forge | downloads: 64,865
 
+FuelSDK:
+    salesforce-fuelsdk-sans | downloads: 666,917
+    salesforce-fuelsdk | downloads: 82,174
+
 gcloud:
     gcloud-aio-auth | downloads: 47,200,367
     gcloud-aio-storage | downloads: 45,007,050
@@ -1460,10 +1005,6 @@ gcloud:
 gen_ai_hub:
     sap-ai-sdk-gen | downloads: 441,261
     generative-ai-hub-sdk | downloads: 117,385
-
-generator:
-    libvirt-python | downloads: 288,496
-    tosa-tools | downloads: 205,559
 
 genie:
     genie-libs-conf | downloads: 251,817
@@ -1489,7 +1030,7 @@ geoarrow:
     geoarrow-rust-core | downloads: 56,930
 
 git:
-    gitpython | downloads: 271,400,053
+    gitpython | downloads: 272,400,053
     release-tag | downloads: 169,637
 
 github:
@@ -1594,7 +1135,6 @@ google:
     google-cloud-billing | downloads: 681,436
     google-cloud-bigquery-logging | downloads: 640,280
     google-events | downloads: 612,516
-    xds-protos | downloads: 611,224
     google-cloud-video-transcoder | downloads: 571,851
     google-cloud-bigquery-connection | downloads: 545,659
     google-ads-admanager | downloads: 489,045
@@ -1644,12 +1184,6 @@ google:
     grpc-google-logging-v2 | downloads: 52,412
     google-cloud-biglake | downloads: 43,376
 
-google-stubs:
-    types-protobuf | downloads: 68,634,841
-    google-auth-stubs | downloads: 1,006,490
-    types-google-cloud-ndb | downloads: 427,656
-    googleapis-common-protos-stubs | downloads: 170,158
-
 googlesearch:
     google | downloads: 6,232,727
     googlesearch-python | downloads: 1,005,358
@@ -1665,18 +1199,6 @@ great_expectations:
 groundingdino:
     groundingdino-py | downloads: 125,260
     rf-groundingdino | downloads: 38,359
-
-grpc_health-stubs:
-    grpc-stubs | downloads: 3,289,567
-    types-grpcio-health-checking | downloads: 124,304
-
-grpc_reflection-stubs:
-    grpc-stubs | downloads: 3,289,567
-    types-grpcio-reflection | downloads: 136,921
-
-grpc_status-stubs:
-    grpc-stubs | downloads: 3,289,567
-    types-grpcio-status | downloads: 160,420
 
 guardrails:
     openai-guardrails | downloads: 329,492
@@ -1719,30 +1241,6 @@ i18n:
     i18nice | downloads: 301,309
     edx-i18n-tools | downloads: 73,621
 
-images:
-    azure-identity | downloads: 228,626,528
-    biom-format | downloads: 119,374
-    nb-clean | downloads: 103,788
-    jraph | downloads: 86,394
-    mod-wsgi | downloads: 62,484
-
-importlib_metadata:
-    setuptools | downloads: 1,528,671,687
-    importlib-metadata | downloads: 539,654,453
-
-include:
-    h3 | downloads: 11,860,141
-    nvidia-cudnn-frontend | downloads: 4,402,748
-    pylibcudf-cu12 | downloads: 411,537
-    pylzss | downloads: 344,173
-    polyscope | downloads: 289,778
-    libigl | downloads: 249,855
-    tosa-tools | downloads: 205,559
-    pantab | downloads: 187,559
-    sgl-kernel | downloads: 141,380
-    lcm | downloads: 125,250
-    ruckig | downloads: 96,964
-
 inference_cli:
     inference-gpu | downloads: 275,671
     inference-cli | downloads: 249,104
@@ -1780,7 +1278,6 @@ itk:
     itk-registration | downloads: 185,084
 
 jaraco:
-    setuptools | downloads: 1,528,671,687
     jaraco-functools | downloads: 225,097,594
     jaraco-classes | downloads: 221,768,951
     jaraco-context | downloads: 206,794,533
@@ -1804,10 +1301,6 @@ jsonpath:
 junit_conversor:
     flake8-junit-report-basic | downloads: 880,237
     flake8-junit-report | downloads: 74,967
-
-jwt-stubs:
-    types-pyjwt | downloads: 326,432
-    types-jwt | downloads: 98,951
 
 kafka:
     kafka-python | downloads: 26,603,396
@@ -1839,10 +1332,6 @@ kfp:
     kfp-pipeline-spec | downloads: 4,544,481
     kfp-kubernetes | downloads: 198,141
 
-kubernetes-stubs:
-    kubernetes-stubs-elephant-fork | downloads: 508,361
-    kubernetes-typed | downloads: 156,006
-
 kubernetes_ext:
     kubernetes-stubs | downloads: 677,995
     kubernetes-stubs-elephant-fork | downloads: 508,361
@@ -1865,23 +1354,9 @@ lets_be_rational:
     lets-be-rational | downloads: 121,324
     py-lets-be-rational | downloads: 116,447
 
-lib:
-    h3 | downloads: 11,860,141
-    mysql-connector | downloads: 1,319,650
-    teradataml | downloads: 468,167
-    polyscope | downloads: 289,778
-    libigl | downloads: 249,855
-    tosa-tools | downloads: 205,559
-    pantab | downloads: 187,559
-    mysql-connector-python-rf | downloads: 162,899
-    sgl-kernel | downloads: 141,380
-    lcm | downloads: 125,250
-    ruckig | downloads: 96,964
-    torch-directml | downloads: 84,428
-
-lib64:
-    pylibcudf-cu12 | downloads: 411,537
-    sgl-kernel | downloads: 141,380
+Levenshtein:
+    levenshtein | downloads: 21,050,509
+    python-levenshtein-wheels | downloads: 45,447
 
 lightning_fabric:
     pytorch-lightning | downloads: 10,861,913
@@ -1984,17 +1459,13 @@ logstash:
     python-logstash | downloads: 583,174
 
 magic:
-    python-magic | downloads: 30,732,583
+    python-magic | downloads: 31,732,583
     python-magic-bin | downloads: 180,476
     file-magic | downloads: 88,804
 
 mailmerge:
     docx-mailmerge | downloads: 222,007
     docx-mailmerge2 | downloads: 123,622
-
-main:
-    mcpforunityserver | downloads: 265,705
-    workspace-mcp | downloads: 250,263
 
 markdown_inline_graphviz:
     markdown-graphviz-inline | downloads: 552,220
@@ -2004,13 +1475,13 @@ marshmallow_oneofschema:
     marshmallow-oneofschema | downloads: 6,419,094
     marshmallow-fastoneofschema | downloads: 195,975
 
+MeCab:
+    mecab-python3 | downloads: 1,043,843
+    mecab | downloads: 535,385
+
 mecab_ko_dic:
     mecab-ko-dic | downloads: 106,862
     python-mecab-ko-dic | downloads: 77,452
-
-media:
-    aws-sam-cli | downloads: 2,273,959
-    pyportfolioopt | downloads: 193,072
 
 memoize:
     py-memoize | downloads: 195,412
@@ -2046,13 +1517,6 @@ microsoft_teams:
     microsoft-teams-api | downloads: 988,522
     microsoft-teams-apps | downloads: 759,499
 
-misc:
-    pyodps | downloads: 5,362,239
-    fake-http-header | downloads: 640,185
-    leptonai | downloads: 606,014
-    pymobiledevice3 | downloads: 597,819
-    audmath | downloads: 90,478
-
 mistralai:
     mistralai-workflows | downloads: 178,970
     mistralai-workflows-plugins-mistralai | downloads: 79,880
@@ -2076,10 +1540,6 @@ mo_parsing:
 model_archiver:
     model-archiver | downloads: 351,559
     torch-model-archiver | downloads: 96,950
-
-models:
-    mcpforunityserver | downloads: 265,705
-    llama-models | downloads: 143,610
 
 mooncake:
     mooncake-transfer-engine | downloads: 307,104
@@ -3812,10 +3272,6 @@ nose:
     pynose | downloads: 1,034,948
     nose-py3 | downloads: 176,027
 
-notebooks:
-    pyodps | downloads: 5,362,239
-    fakesnow | downloads: 1,271,548
-
 noxfile:
     patchelf | downloads: 13,648,979
     pybind11-global | downloads: 564,764
@@ -3912,7 +3368,6 @@ openapi:
 opencensus:
     opencensus-context | downloads: 25,185,927
     opencensus-ext-azure | downloads: 10,922,021
-    xds-protos | downloads: 611,224
     opencensus-ext-logging | downloads: 462,743
     opencensus-ext-requests | downloads: 135,676
     opencensus-proto | downloads: 93,395
@@ -4006,6 +3461,7 @@ opentelemetry:
     opentelemetry-exporter-gcp-trace | downloads: 12,266,349
     opentelemetry-propagator-aws-xray | downloads: 11,841,766
     opentelemetry-instrumentation-celery | downloads: 10,730,806
+    opentelemetry-instrumentation-asyncpg | downloads: 9,640,401
     opentelemetry-exporter-gcp-logging | downloads: 8,562,506
     opentelemetry-instrumentation-lancedb | downloads: 7,262,836
     opentelemetry-exporter-gcp-monitoring | downloads: 7,089,424
@@ -4080,7 +3536,6 @@ opentelemetry:
     opentelemetry-exporter-prometheus-remote-write | downloads: 1,292,745
     opentelemetry-instrumentation-click | downloads: 1,279,800
     opentelemetry-exporter-zipkin-json | downloads: 944,970
-    xds-protos | downloads: 611,224
     opentelemetry-test-utils | downloads: 592,155
     opentelemetry-exporter-jaeger-thrift | downloads: 564,065
     opentelemetry-instrumentation-pymssql | downloads: 389,659
@@ -4095,16 +3550,11 @@ opentelemetry:
     opentelemetry-resource-detector-containerid | downloads: 155,780
     aiobotocore-otel | downloads: 135,332
     opentelemetry-exporter-credential-provider-gcp | downloads: 19,817
-    opentelemetry-instrumentation-asyncpg | downloads: 9,640,401
 
 optimum:
     optimum-onnx | downloads: 660,578
     optimum-quanto | downloads: 288,790
     optimum-intel | downloads: 149,638
-
-options:
-    teradataml | downloads: 468,167
-    pyiqa | downloads: 397,996
 
 orbax:
     orbax-checkpoint | downloads: 5,634,670
@@ -4144,10 +3594,6 @@ pdm_build:
     fastapi-slim | downloads: 71,212
     typer-cli | downloads: 70,149
 
-peewee-stubs:
-    peewee | downloads: 49,097,060
-    types-peewee | downloads: 103,029
-
 percy:
     percy-appium-app | downloads: 269,374
     percy-selenium | downloads: 131,828
@@ -4157,10 +3603,6 @@ phoenix:
     arize-phoenix-otel | downloads: 1,910,556
     arize-phoenix-client | downloads: 1,083,209
     arize-phoenix-evals | downloads: 825,359
-
-pika-stubs:
-    types-pika-ts | downloads: 184,259
-    types-pika | downloads: 143,094
 
 pinecone_plugins:
     pinecone-plugin-assistant | downloads: 1,882,104
@@ -4174,11 +3616,6 @@ playwright_stealth:
     playwright-stealth | downloads: 3,289,760
     tf-playwright-stealth | downloads: 624,632
 
-plugins:
-    leptonai | downloads: 606,014
-    hermes-agent | downloads: 534,932
-    fiftyone | downloads: 249,943
-
 plum:
     plum-dispatch | downloads: 1,735,868
     plum-py | downloads: 117,369
@@ -4188,12 +3625,18 @@ polars:
     polars-u64-idx | downloads: 64,836
 
 pptx:
-    python-pptx | downloads: 63,513,579
+    python-pptx | downloads: 64,513,579
     pypptx-with-oxml | downloads: 152,790
 
 pre_commit_hooks:
     pre-commit-hooks | downloads: 1,797,797
     dbt-autofix | downloads: 176,004
+
+Products:
+    zope | downloads: 119,240
+    products-cmfcore | downloads: 46,557
+    products-zcatalog | downloads: 44,723
+    products-genericsetup | downloads: 43,667
 
 progressbar:
     progressbar2 | downloads: 18,924,738
@@ -4209,17 +3652,9 @@ protoc_gen_openapiv2:
     tecton | downloads: 1,969,130
     authzed | downloads: 955,950
 
-protoc_gen_openapiv2/options:
-    protoc-gen-openapiv2 | downloads: 1,955,463
-    grpc-gateway-protoc-gen-openapiv2 | downloads: 201,171
-
 psycopg2:
-    psycopg2-binary | downloads: 265,483,656
+    psycopg2-binary | downloads: 266,483,656
     aws-psycopg2 | downloads: 3,282,609
-
-pubsub:
-    pypubsub | downloads: 303,338
-    canvas | downloads: 51,688
 
 pulp_glue:
     pulp-glue | downloads: 228,412
@@ -4320,6 +3755,10 @@ pyflink:
     apache-flink | downloads: 210,515
     apache-flink-libraries | downloads: 157,676
 
+PyFunceble:
+    pyfunceble-process-manager | downloads: 105,018
+    pyfunceble-dev | downloads: 103,155
+
 pymatgen:
     pymatgen-io-validation | downloads: 1,784,470
     pymatgen-core | downloads: 707,632
@@ -4334,6 +3773,24 @@ pynvml:
     nvidia-ml-py | downloads: 20,614,820
     nvidia-ml-py3 | downloads: 419,256
 
+PyObjCTools:
+    pyobjc-framework-cocoa | downloads: 2,716,602
+    pyobjc-framework-exceptionhandling | downloads: 625,429
+
+PyQt5:
+    pyqt5 | downloads: 4,467,660
+    pyqt5-qt5 | downloads: 3,355,718
+    pyqt5-sip | downloads: 3,346,441
+    pyqtwebengine | downloads: 292,822
+    pyqtwebengine-qt5 | downloads: 286,781
+
+PyQt6:
+    pyqt6 | downloads: 3,644,020
+    pyqt6-qt6 | downloads: 2,644,020
+    pyqt6-sip | downloads: 2,611,829
+    pyqt6-webengine-qt6 | downloads: 234,952
+    pyqt6-webengine | downloads: 229,600
+
 pyrogram:
     pyrofork | downloads: 249,902
     kurigram | downloads: 86,610
@@ -4343,11 +3800,16 @@ pyroscope:
     pyroscope-io | downloads: 14,810,984
     pyroscope-otel | downloads: 1,381,516
 
+PySide6:
+    pyside6 | downloads: 4,851,432
+    pyside6-essentials | downloads: 3,851,432
+    pyside6-addons | downloads: 3,707,970
+
 pyspark:
-    databricks-connect | downloads: 11,892,750
     pyspark-client | downloads: 2,098,121
     pyspark-stubs | downloads: 111,058
     pyspark-extension | downloads: 91,407
+    pyspark | downloads: 1,000
 
 pytoniq_core:
     pytoniq-core-fork | downloads: 168,954
@@ -4359,6 +3821,10 @@ qase:
     qase-api-v2-client | downloads: 139,447
     qase-pytest | downloads: 127,604
 
+QtCore:
+    pyside2 | downloads: 150,857
+    shiboken2 | downloads: 117,465
+
 re2:
     google-re2 | downloads: 16,357,507
     pyre2 | downloads: 65,826
@@ -4366,10 +3832,6 @@ re2:
 readline:
     pyreadline3 | downloads: 7,195,103
     gnureadline | downloads: 348,444
-
-recipes:
-    speechbrain | downloads: 1,854,971
-    torchtune | downloads: 308,708
 
 redis_cache:
     python-redis-cache | downloads: 181,869
@@ -4388,27 +3850,9 @@ requests_unixsocket:
     requests-unixsocket | downloads: 2,809,403
     requests-unixsocket2 | downloads: 484,100
 
-requirements:
-    requirements-parser | downloads: 17,757,067
-    aws-sam-cli | downloads: 2,273,959
-    feast | downloads: 665,997
-    ada-url | downloads: 416,101
-    rax | downloads: 151,834
-    tsdb | downloads: 121,702
-    benchpots | downloads: 116,257
-
 resolver:
     sceptre-cmd-resolver | downloads: 109,740
     sceptre-file-resolver | downloads: 109,385
-
-resources:
-    diagrams | downloads: 6,983,884
-    pytest-textual-snapshot | downloads: 320,893
-    qrdet | downloads: 79,902
-
-rest_framework-stubs:
-    djangorestframework-stubs | downloads: 6,038,843
-    djangorestframework-types | downloads: 383,941
 
 rest_framework_jwt:
     drf-jwt | downloads: 448,160
@@ -4440,6 +3884,11 @@ robotcode:
 robots:
     robotspy | downloads: 484,373
     django-robots | downloads: 165,051
+
+RPA:
+    rpaframework | downloads: 701,783
+    rpaframework-core | downloads: 557,312
+    rpaframework-pdf | downloads: 540,763
 
 rpy2:
     rpy2-robjects | downloads: 106,688
@@ -4496,67 +3945,13 @@ sagemaker:
     sagemaker-train | downloads: 1,322,170
     sagemaker-mlops | downloads: 1,312,013
 
-samples:
-    azure-datalake-store | downloads: 22,489,056
-    azure-cosmosdb-table | downloads: 2,687,419
-    pynvvideocodec | downloads: 952,565
-    ebaysdk | downloads: 128,369
-    amazon-kclpy | downloads: 62,169
-
 scenario:
     ops-scenario | downloads: 136,255
     langwatch-scenario | downloads: 94,320
 
-scripts:
-    types-awscrt | downloads: 55,229,550
-    prance | downloads: 6,080,525
-    palettable | downloads: 2,626,453
-    tensordict | downloads: 2,573,891
-    unleashclient | downloads: 2,298,836
-    ibm-watsonx-ai | downloads: 2,272,346
-    nemo-toolkit | downloads: 1,601,066
-    unsloth-zoo | downloads: 1,379,632
-    torchrl | downloads: 1,240,022
-    botorch | downloads: 911,729
-    xdsl | downloads: 494,942
-    openshift | downloads: 491,738
-    mlforecast | downloads: 479,562
-    reflex | downloads: 396,533
-    fitz | downloads: 331,185
-    fleet-python | downloads: 296,759
-    proces | downloads: 281,428
-    workspace-mcp | downloads: 250,263
-    open-interpreter | downloads: 228,108
-    paracelsus | downloads: 202,355
-    ax-platform | downloads: 189,115
-    linode-api4 | downloads: 184,209
-    tinybird | downloads: 174,308
-    behavex | downloads: 167,318
-    django-cms | downloads: 128,904
-    cuga | downloads: 120,563
-    mace-torch | downloads: 114,362
-    langchain-cli | downloads: 107,001
-    pagerduty-mcp | downloads: 102,523
-    torch-directml | downloads: 84,428
-    verl | downloads: 80,282
-    tensordict-nightly | downloads: 51,098
-    audiocraft | downloads: 18,173
-
 serial:
-    pyserial | downloads: 16,928,109
+    pyserial | downloads: 17,928,109
     pyserial-labgrid | downloads: 63,925
-
-services:
-    oci-cli | downloads: 1,969,854
-    mcpforunityserver | downloads: 265,705
-
-settings:
-    edx-opaque-keys | downloads: 119,965
-    canvas | downloads: 51,688
-
-setup:
-    cvxpy | downloads: 5,310,742
-    cvxpy-base | downloads: 189,531
 
 setupinfo:
     mysql-connector | downloads: 1,319,650
@@ -4570,15 +3965,13 @@ sha3:
     safe-pysha3 | downloads: 350,470
     pysha3 | downloads: 142,008
 
-share:
-    mitsuba | downloads: 360,539
-    libigl | downloads: 249,855
-    lcm | downloads: 125,250
-    ruckig | downloads: 96,964
-
 sherpa_onnx:
     sherpa-onnx | downloads: 1,013,957
     sherpa-onnx-core | downloads: 741,999
+
+Shiboken:
+    shiboken6 | downloads: 4,851,432
+    pyside6-essentials | downloads: 3,851,432
 
 sigma:
     pysigma | downloads: 455,763
@@ -4700,10 +4093,6 @@ sql:
     jupysql | downloads: 148,255
     python-sql | downloads: 103,344
 
-sqlalchemy-stubs:
-    sqlalchemy2-stubs | downloads: 2,519,011
-    types-sqlalchemy | downloads: 430,117
-
 sqlalchemy_redshift:
     sqlalchemy-redshift | downloads: 5,126,278
     chalk-sqlalchemy-redshift | downloads: 241,733
@@ -4719,11 +4108,6 @@ sqlglot:
 sqs_extended_client:
     amazon-sqs-extended-client | downloads: 225,740
     sqs-extended-client | downloads: 71,455
-
-src:
-    clevercsv | downloads: 423,013
-    dlt-meta | downloads: 232,264
-    mkdocs-plugin-inline-svg | downloads: 76,562
 
 statsd:
     statsd-python | downloads: 318,996
@@ -4749,10 +4133,6 @@ tap:
 telnetlib:
     telnetlib3 | downloads: 1,702,170
     standard-telnetlib | downloads: 572,130
-
-templates:
-    speechbrain | downloads: 1,854,971
-    autogen | downloads: 163,933
 
 tencentcloud:
     tencentcloud-sdk-python-common | downloads: 1,071,147
@@ -4785,63 +4165,6 @@ tensorrt_bindings:
     tensorrt-cu12-bindings | downloads: 256,042
     tensorrt-cu13-bindings | downloads: 203,212
 
-test:
-    dbt-protos | downloads: 31,094,239
-    sendgrid | downloads: 26,646,285
-    capi-param-builder-python | downloads: 3,435,755
-    einx | downloads: 2,664,157
-    palettable | downloads: 2,626,453
-    chess | downloads: 2,486,554
-    glob2 | downloads: 1,071,664
-    svgelements | downloads: 1,038,154
-    mkdocs-mermaid2-plugin | downloads: 972,262
-    dkimpy | downloads: 799,800
-    ir-datasets | downloads: 690,438
-    xds-protos | downloads: 611,224
-    pypd | downloads: 546,251
-    cloudsmith-api | downloads: 500,868
-    siphash24 | downloads: 478,364
-    phonemizer | downloads: 448,444
-    aiobreaker | downloads: 399,372
-    tarsafe | downloads: 378,372
-    matrix-client | downloads: 360,156
-    flask-silk | downloads: 329,671
-    pycups | downloads: 313,372
-    joblibspark | downloads: 284,341
-    mdxpy | downloads: 254,545
-    readline | downloads: 251,978
-    rocrate | downloads: 235,985
-    lib4sbom | downloads: 229,723
-    pmtiles | downloads: 220,352
-    neomodel | downloads: 210,935
-    cyscale | downloads: 196,688
-    nlpaug | downloads: 188,577
-    grafana-client | downloads: 176,444
-    sparkpost | downloads: 168,764
-    flask-redis | downloads: 153,837
-    swagger-ui-py | downloads: 152,714
-    finvizfinance | downloads: 151,453
-    devcycle-python-server-sdk | downloads: 150,177
-    bandwidth-sdk | downloads: 148,046
-    pysmartdl | downloads: 141,413
-    lycoris-lora | downloads: 116,179
-    selenium-screenshot | downloads: 115,206
-    smartapi-python | downloads: 105,131
-    pydantic-tes | downloads: 102,558
-    unfoldnd | downloads: 102,445
-    sslcrypto | downloads: 85,103
-    tfidf-matcher | downloads: 83,498
-    django-diagram | downloads: 82,775
-    conjur-client | downloads: 81,549
-    homebase | downloads: 81,414
-    python-ranges | downloads: 78,888
-    mparticle | downloads: 67,836
-    fingerprint-pro-server-api-sdk | downloads: 63,026
-    edx-lint | downloads: 62,131
-    databricks-mosaic | downloads: 46,785
-    simple-slurm | downloads: 20,588
-    assisted-service-client | downloads: 19,377
-
 test_app:
     django-registration-redux | downloads: 74,937
     django-smart-selects | downloads: 66,867
@@ -4854,271 +4177,13 @@ testcontainers:
     testcontainers-core | downloads: 328,524
     testcontainers-postgres | downloads: 75,922
 
-testing:
-    testing-common-database | downloads: 5,157,059
-    testing-postgresql | downloads: 5,146,830
-    anndata | downloads: 1,681,341
-    legacy-api-wrap | downloads: 1,111,337
-    scanpy | downloads: 929,575
-    fast-array-utils | downloads: 377,354
-    dtreeviz | downloads: 72,825
-
 testit:
     func-timeout | downloads: 7,183,126
     testit-python-commons | downloads: 34,528
 
-tests:
-    ydb | downloads: 201,827,054
-    looker-sdk | downloads: 19,432,055
-    smdebug-rulesconfig | downloads: 16,474,654
-    swesmith | downloads: 15,320,259
-    keyrings-google-artifactregistry-auth | downloads: 14,206,228
-    firecrawl-py | downloads: 7,033,435
-    prance | downloads: 6,080,525
-    roboflow | downloads: 5,306,073
-    databricks-vectorsearch | downloads: 3,417,951
-    dynamodb-json | downloads: 3,156,534
-    python-barcode | downloads: 2,988,212
-    markdown-to-mrkdwn | downloads: 2,890,151
-    azure-cosmosdb-table | downloads: 2,687,419
-    waybackpy | downloads: 2,602,107
-    databricks-ai-search | downloads: 2,421,192
-    mleap | downloads: 2,229,699
-    adagio | downloads: 2,182,144
-    nemo-toolkit | downloads: 1,601,066
-    unsloth-zoo | downloads: 1,379,632
-    textstat | downloads: 1,378,007
-    pandas-datareader | downloads: 1,370,871
-    pyrootutils | downloads: 1,323,183
-    firecrawl | downloads: 1,317,100
-    py-order-utils | downloads: 1,277,659
-    collate-sqllineage | downloads: 1,264,183
-    artifacts-keyring | downloads: 1,244,528
-    py-asciimath | downloads: 1,160,979
-    azureml-featurestore | downloads: 1,095,358
-    esp-coredump | downloads: 1,070,556
-    django-vite | downloads: 1,060,759
-    openapi-schema-pydantic | downloads: 1,003,893
-    eventkit | downloads: 951,970
-    spacy-language-detection | downloads: 951,586
-    cint | downloads: 935,850
-    azure-functions-durable | downloads: 922,967
-    logzio-python-handler | downloads: 890,925
-    torch-fidelity | downloads: 885,987
-    cvdupdate | downloads: 868,790
-    cerberus-python-client | downloads: 818,682
-    py-builder-signing-sdk | downloads: 802,086
-    draccus | downloads: 800,845
-    pylint-gitlab | downloads: 787,120
-    pyjks | downloads: 765,528
-    piccolo | downloads: 763,958
-    python-json-config | downloads: 750,527
-    py-clob-client | downloads: 734,430
-    optimizely-sdk | downloads: 665,551
-    tgcrypto | downloads: 643,025
-    oauth2 | downloads: 595,801
-    confusables | downloads: 580,354
-    django-bulk-update | downloads: 544,846
-    ha-mcp | downloads: 533,960
-    descript-audio-codec | downloads: 529,030
-    graypy | downloads: 527,279
-    fast-diff-match-patch | downloads: 498,332
-    propka | downloads: 497,349
-    xdsl | downloads: 494,942
-    latex2sympy2 | downloads: 494,188
-    mlforecast | downloads: 479,562
-    pydomo | downloads: 451,603
-    x690 | downloads: 450,918
-    tableschema | downloads: 444,452
-    color-matcher | downloads: 442,963
-    cloudconvert | downloads: 440,886
-    html-for-docx | downloads: 432,432
-    rq-dashboard | downloads: 423,716
-    nutter | downloads: 418,428
-    ada-url | downloads: 416,101
-    flask-script | downloads: 401,200
-    django-hosts | downloads: 398,763
-    pyiqa | downloads: 397,996
-    dataflows-tabulator | downloads: 396,958
-    reflex | downloads: 396,533
-    ciscoconfparse | downloads: 394,546
-    softlayer | downloads: 383,753
-    tf2onnx | downloads: 381,485
-    pybars3 | downloads: 351,394
-    django-cryptography-django5 | downloads: 340,362
-    testcontainers-core | downloads: 328,524
-    parameter-decorators | downloads: 327,600
-    time-aware-imputer | downloads: 325,716
-    pytorch-forecasting | downloads: 320,460
-    argostranslate | downloads: 318,057
-    appdata | downloads: 308,836
-    pennylane | downloads: 307,416
-    fleet-python | downloads: 296,759
-    cmreshandler | downloads: 291,673
-    azure-cli-diff-tool | downloads: 287,879
-    supertokens-python | downloads: 281,399
-    pybars4 | downloads: 280,660
-    pymonetdb | downloads: 257,863
-    simple-dwd-weatherforecast | downloads: 254,501
-    robotframework-appiumlibrary | downloads: 252,601
-    django-pipeline | downloads: 251,873
-    coinbase-advanced-py | downloads: 248,626
-    multiprocessing-logging | downloads: 247,481
-    dataframe-image | downloads: 246,542
-    actions-toolkit | downloads: 225,390
-    mastercard-oauth1-signer | downloads: 222,914
-    threadloop | downloads: 222,479
-    model-index | downloads: 221,845
-    pyrtf3 | downloads: 220,551
-    text2digits | downloads: 213,694
-    duplocloud-client | downloads: 211,164
-    csv-diff | downloads: 208,653
-    streamlit-pdf-viewer | downloads: 207,386
-    tosa-tools | downloads: 205,559
-    recurly | downloads: 204,888
-    fastapi-events | downloads: 198,991
-    rootutils | downloads: 198,746
-    learnosity-sdk | downloads: 193,551
-    to-requirements-txt | downloads: 193,008
-    glicko2 | downloads: 186,719
-    nassl | downloads: 181,650
-    iterative-stratification | downloads: 178,656
-    apimatic-core | downloads: 178,097
-    launchable | downloads: 174,910
-    tinybird | downloads: 174,308
-    phply | downloads: 174,076
-    base58check | downloads: 173,867
-    persisting-theory | downloads: 167,325
-    behavex | downloads: 167,318
-    connector-sdk-types | downloads: 166,429
-    radish-bdd | downloads: 164,765
-    pyodata | downloads: 162,428
-    flake8-formatter-junit-xml | downloads: 161,035
-    pytest-container | downloads: 160,511
-    contentstack-utils | downloads: 159,044
-    terraform-compliance | downloads: 157,774
-    sphinxcontrib-katex | downloads: 156,573
-    pynamodb-attributes | downloads: 155,551
-    dataengine | downloads: 153,992
-    bitcoinlib | downloads: 153,287
-    f90nml | downloads: 151,638
-    slh-dsa | downloads: 151,539
-    schwab-py | downloads: 151,324
-    mock-firestore | downloads: 150,728
-    apimatic-requests-client-adapter | downloads: 149,399
-    humps | downloads: 147,578
-    fold-to-ascii | downloads: 146,239
-    tiktokapi | downloads: 144,120
-    fuzzyfinder | downloads: 143,945
-    rouge-metric | downloads: 143,307
-    observable | downloads: 141,621
-    py-builder-relayer-client | downloads: 140,821
-    mlb-statsapi | downloads: 139,757
-    paddle-python-sdk | downloads: 137,765
-    django-slack | downloads: 133,249
-    lightphe | downloads: 130,946
-    pypemicro | downloads: 130,043
-    tacacs-plus | downloads: 129,950
-    ebaysdk | downloads: 128,369
-    garmin-fit-sdk | downloads: 128,279
-    pylint-protobuf | downloads: 125,931
-    piecewise-regression | downloads: 125,664
-    tabulator | downloads: 125,260
-    clabe | downloads: 125,005
-    filestack-python | downloads: 124,690
-    pytest-operator | downloads: 124,578
-    phone-iso3166 | downloads: 121,565
-    nemo-text-processing | downloads: 120,586
-    mailosaur | downloads: 120,441
-    sax | downloads: 118,765
-    cufile-python | downloads: 117,611
-    kuksa-client | downloads: 117,220
-    sentry-kafka-schemas | downloads: 115,457
-    mace-torch | downloads: 114,362
-    django-queryable-properties | downloads: 110,967
-    airporttime | downloads: 110,682
-    yorm | downloads: 109,915
-    pybatfish | downloads: 109,543
-    laion-clap | downloads: 107,563
-    jsql | downloads: 107,238
-    pybboxes | downloads: 106,517
-    freeze-uuid | downloads: 106,332
-    pyeventsystem | downloads: 104,849
-    polarion | downloads: 103,056
-    pagerduty-mcp | downloads: 102,523
-    django-more-admin-filters | downloads: 101,324
-    ofxtools | downloads: 100,975
-    iab-tcf | downloads: 100,940
-    cloudshell-shell-core | downloads: 100,063
-    json-timeseries | downloads: 99,864
-    robin-stocks | downloads: 97,022
-    mssql | downloads: 96,166
-    audeer | downloads: 96,117
-    lambda-warmer-py | downloads: 95,113
-    punq | downloads: 92,714
-    djangocms-text-ckeditor | downloads: 92,145
-    indic-transliteration | downloads: 91,340
-    audmath | downloads: 90,478
-    aimrecords | downloads: 90,028
-    stubs | downloads: 89,202
-    django-versatileimagefield | downloads: 87,567
-    ncls | downloads: 85,729
-    keyphrase-vectorizers | downloads: 84,156
-    surveygizmo | downloads: 83,644
-    gpt-researcher | downloads: 81,308
-    verl | downloads: 80,282
-    python-resize-image | downloads: 79,033
-    rwslib | downloads: 78,835
-    dominodatalab | downloads: 77,784
-    govee-api-laggat | downloads: 76,161
-    testcontainers-postgres | downloads: 75,922
-    pampy | downloads: 74,682
-    e3nn-jax | downloads: 74,197
-    pydevicetree | downloads: 73,976
-    tpu-inference | downloads: 73,859
-    opensimplex | downloads: 73,299
-    gpflow | downloads: 70,699
-    quart-compress | downloads: 69,196
-    pyranges | downloads: 68,998
-    pylint-flask-sqlalchemy | downloads: 67,654
-    plim | downloads: 66,073
-    mastercard-api-core | downloads: 65,612
-    python-upwork-oauth2 | downloads: 65,584
-    playback-studio | downloads: 64,834
-    pyswarms | downloads: 64,803
-    pyspark-nested-functions | downloads: 64,292
-    tcvectordb | downloads: 62,799
-    flask-awscognito | downloads: 60,589
-    iteround | downloads: 57,411
-    klaviyo | downloads: 55,984
-    aiohttp-security | downloads: 53,365
-    clawmetry | downloads: 51,853
-    django-pgcrypto-fields | downloads: 49,509
-    ha-mcp-dev | downloads: 46,378
-    zccache | downloads: 42,792
-    relenv | downloads: 36,248
-    datarobot-early-access | downloads: 33,765
-    bec-lib | downloads: 26,986
-    bec-server | downloads: 26,076
-    jina | downloads: 24,824
-    cuenca-validations | downloads: 21,954
-    torchmonarch | downloads: 21,493
-    connector-py | downloads: 18,251
-    flask-monitoringdashboard | downloads: 10,846
-    abstra | downloads: 10,270
-    debug-mgr | downloads: 7,910
-    transformers-cfg | downloads: 2,916
-    gluoncv | downloads: 51,745
-
 tf_keras:
     tf-keras | downloads: 3,859,455
     tf-keras-nightly | downloads: 1,129,996
-
-third_party:
-    pytype | downloads: 902,235
-    tensorflow-cpu-aws | downloads: 142,210
-    tensorflow-aarch64 | downloads: 131,751
-    torch-directml | downloads: 84,428
 
 titiler:
     titiler-core | downloads: 160,840
@@ -5129,21 +4194,6 @@ titiler:
 tobikodata:
     tobiko-cloud-helpers | downloads: 17,599
     tobiko-cloud-api-client | downloads: 14,832
-
-tools:
-    sglang | downloads: 316,597,633
-    cron-descriptor | downloads: 23,838,975
-    speechbrain | downloads: 1,854,971
-    fakesnow | downloads: 1,271,548
-    zigpy | downloads: 674,160
-    hermes-agent | downloads: 534,932
-    tf2onnx | downloads: 381,485
-    opensearch-mcp-server-py | downloads: 318,405
-    lib4sbom | downloads: 229,723
-    strands-agents-builder | downloads: 216,049
-    pymgclient | downloads: 128,702
-    tpu-inference | downloads: 73,859
-    office-powerpoint-mcp-server | downloads: 31,664
 
 toon:
     python-toon | downloads: 672,276
@@ -5176,11 +4226,9 @@ tsv:
     linear-tsv | downloads: 235,393
     tsv2py | downloads: 90,806
 
-tutorials:
-    speechbrain | downloads: 1,854,971
-    botorch | downloads: 911,729
-    ax-platform | downloads: 189,115
-    nuscenes-devkit | downloads: 176,105
+TTS:
+    coqui-tts | downloads: 177,002
+    tts | downloads: 98,129
 
 twisted:
     autobahn | downloads: 6,787,951
@@ -5887,10 +4935,6 @@ uipath:
     uipath-runtime | downloads: 814,521
     uipath-core | downloads: 795,809
 
-ujson-stubs:
-    ujson | downloads: 33,107,637
-    types-ujson | downloads: 2,450,874
-
 ulid:
     python-ulid | downloads: 10,045,601
     ulid-py | downloads: 1,756,458
@@ -5911,12 +4955,6 @@ uptime_kuma_api:
     uptime-kuma-api | downloads: 2,012,682
     uptime-kuma-api-v2 | downloads: 90,237
 
-utils:
-    hermes-agent | downloads: 534,932
-    teradataml | downloads: 468,167
-    mcpforunityserver | downloads: 265,705
-    office-powerpoint-mcp-server | downloads: 31,664
-
 uwsgidecorators:
     uwsgi | downloads: 1,909,237
     pyuwsgi | downloads: 514,352
@@ -5924,35 +4962,10 @@ uwsgidecorators:
 validate:
     configobj | downloads: 7,026,952
     authzed | downloads: 955,950
-    xds-protos | downloads: 611,224
 
 vastai_sdk:
     vastai-sdk | downloads: 3,591,929
     vastai | downloads: 2,396,995
-
-vendor:
-    pycln | downloads: 320,271
-    altimate-datapilot-cli | downloads: 104,843
-
-version:
-    vertexai | downloads: 4,553,354
-    dbos | downloads: 1,847,400
-    drf-orjson-renderer | downloads: 352,963
-    ezodf | downloads: 153,482
-    delorean | downloads: 120,657
-
-versioneer:
-    gnupg | downloads: 1,997,522
-    pylatex | downloads: 670,322
-    webexteamssdk | downloads: 576,446
-    versioneer-518 | downloads: 205,345
-    theano-pymc | downloads: 181,262
-    pims | downloads: 167,865
-    theano | downloads: 100,529
-    ed25519 | downloads: 64,821
-    datashape | downloads: 50,484
-    odo | downloads: 35,674
-    blaze | downloads: 34,697
 
 vllm:
     vllm-cpu | downloads: 211,765
@@ -5962,40 +4975,9 @@ vmware:
     vmware-vapi-runtime | downloads: 154,949
     vmware-vcenter | downloads: 153,530
 
-web:
-    sqlmesh | downloads: 554,901
-    label-studio | downloads: 117,760
-    web-py | downloads: 87,813
-
 web_fragments:
     xblock | downloads: 70,843
     web-fragments | downloads: 59,832
-
-website:
-    botorch | downloads: 911,729
-    ax-platform | downloads: 189,115
-
-wheelhouse:
-    pyodps | downloads: 5,362,239
-    polyleven | downloads: 4,488,015
-    scikit-base | downloads: 2,434,560
-    sktime | downloads: 1,107,904
-    clevercsv | downloads: 423,013
-    singlestoredb | downloads: 420,427
-    ada-url | downloads: 416,101
-    crosshair-tool | downloads: 368,105
-    pytorch-forecasting | downloads: 320,460
-    pykalman | downloads: 243,723
-    cyscale | downloads: 196,688
-    pyportfolioopt | downloads: 193,072
-    pyvips-binary | downloads: 169,226
-    skpro | downloads: 168,657
-    hadolint-coatl | downloads: 131,325
-    biom-format | downloads: 119,374
-    scikit-surprise | downloads: 105,968
-    ncls | downloads: 85,729
-    imagededup | downloads: 71,201
-    fitsio | downloads: 36,125
 
 winrt:
     winrt-runtime | downloads: 364,764
@@ -6009,6 +4991,11 @@ winrt:
     winrt-windows-devices-radios | downloads: 186,128
     winrt-windows-media-ocr | downloads: 113,670
     winrt-windows-graphics-imaging | downloads: 113,486
+
+Xlib:
+    python-xlib | downloads: 3,386,607
+    python3-xlib | downloads: 1,725,861
+    xlib | downloads: 150,879
 
 zc:
     zc-lockfile | downloads: 3,017,325
@@ -6074,4 +5061,3 @@ zope:
     zope-copy | downloads: 51,111
     zope-componentvocabulary | downloads: 48,302
     zope-sendmail | downloads: 44,899
-
