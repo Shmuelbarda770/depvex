@@ -22,6 +22,7 @@ that contain multiple independently managed services.
   microservice repositories.
 - Detailed check output for missing, stale, and changed entries.
 - Optional `[project].dependencies` sync/check and service dependency reports.
+- Compatibility analysis for one package or an entire requirements-style file.
 
 ## Install
 
@@ -70,6 +71,46 @@ depvex --report .
 
 Use `--pyproject` with `--scan` to write, or with `--check` to verify,
 `[project].dependencies` in an existing `pyproject.toml`.
+
+### Compatibility analysis
+
+Check a package before installing it, including its direct and transitive
+dependencies:
+
+```bash
+depvex --compatibility "fastapi>=0.115" .
+depvex --compatibility "fastapi>=0.115" --format json .
+```
+
+To check every requirement in a requirements-style file, use
+`--compatibility-file`:
+
+```bash
+depvex --compatibility-file requirements.txt .
+depvex --compatibility-file install.txt --format json .
+```
+
+Blank lines and comments are ignored, as are `-r`, `--`, `-e`, and `git+`
+entries. The analyzer checks each remaining requirement against the project's
+existing requirements without installing packages or modifying files.
+
+This is more than an installed-package check. `pip show PACKAGE` tells you
+which version is installed in the current environment; Depvex checks whether
+the version you request satisfies the project's declared constraints. For
+example, if `requirements.txt` contains `requests==2.34.2`, checking
+`requests==2.34.1` correctly reports a conflict, even if `requests` is already
+installed, because the exact version pin is not satisfied.
+
+The analyzer also follows direct and transitive dependencies. A package can
+have no direct conflict while one of its dependencies conflicts with a package
+already pinned by the project. This makes the command useful as a pre-install
+review before modifying the environment or committing a new requirements
+file.
+
+By default, package metadata may be resolved from PyPI. Add `--no-network` to
+use only locally installed metadata. A confirmed conflict returns exit code
+`1`, an uncertain result returns `2`, and `0` means all checked requirements
+are compatible.
 
 ### Version note
 

@@ -115,6 +115,8 @@ combined with `ignore_dirs` from `depvex.yaml`.
 | `depvex --watch [path]` | Scan once, then watch the path. | Updates affected requirements files after the debounce delay. |
 | `depvex --report [path]` | Inspect dependency ownership. | Lists root/service dependencies and shared packages without writing files. |
 | `depvex --diff [path]` | Preview changes. | Prints colour-coded missing, stale, and changed dependencies without writing files; exits `1` when changes exist. |
+| `depvex --compatibility PACKAGE [path]` | Analyze a package before installing it. | Checks direct and transitive requirement conflicts without modifying the environment. |
+| `depvex --compatibility-file FILE [path]` | Analyze an entire requirements-style file. | Checks every package requirement and aggregates conflicts and uncertain results. |
 
 `-v`, `-V`, and `--version` continue to print the installed version.
 
@@ -127,6 +129,62 @@ depvex --check --pyproject .
 ```
 
 `path` defaults to the current directory.
+
+### Compatibility analysis
+
+Use `--compatibility` as a dry-run before adding a package to an existing
+environment or requirements file:
+
+```bash
+depvex --compatibility "fastapi>=0.115" .
+depvex --compatibility "fastapi>=0.115" --format json .
+depvex --compatibility "fastapi>=0.115" --no-network .
+depvex --compatibility-file requirements.txt .
+depvex --compatibility-file install.txt --format json .
+```
+
+The analyzer reads the project's requirements files, resolves package metadata
+from the local environment and, when allowed, PyPI, then examines the target's
+dependency graph. It never runs `pip install` and never modifies a file.
+
+This check answers a different question from `pip show PACKAGE`. `pip show`
+only confirms that some version is installed in the current Python environment.
+Depvex checks whether the requested version can coexist with the versions and
+constraints already declared by the project. For example, if the project has
+`requests==2.34.2`, then `requests==2.34.1` is a conflict even when
+`requests` is installed, because the requested version does not satisfy the
+project's exact pin.
+
+Depvex also follows the candidate package's dependencies. If a new package
+requires `urllib3>=2.0` while the project pins `urllib3==1.26.0`, the direct
+package may look safe but the installation would still create a transitive
+conflict. This is the main reason to run the check before changing the
+environment: it can expose conflicts that are not visible from the package
+name alone.
+
+Use `--compatibility-file FILE` when you want to review several packages before
+installing them. The file uses the usual requirements format: blank lines and
+comments are ignored, as are `-r`, `--`, `-e`, and `git+` entries. Each remaining
+requirement is checked against the project's existing requirements and its
+result is printed separately. For example:
+
+```bash
+depvex --compatibility-file install.txt .
+```
+
+By default, compatibility checks may query PyPI for versions and dependency
+metadata. Add `--no-network` to use only locally installed metadata; packages
+that cannot be resolved are reported as `REVIEW REQUIRED` rather than as a
+confirmed conflict. The file command returns `1` if any requirement conflicts,
+`2` if there are no conflicts but at least one result is uncertain, and `0` when
+all requirements are compatible.
+
+Exit codes are designed for automation: `0` means no known conflict, `1`
+means a direct or transitive conflict was found, and `2` means the result is
+uncertain because candidate or dependency metadata was unavailable. JSON output
+contains stable issue codes, severity, package, requirement, source, and the
+packages examined. A future resolver can use this same report contract to add
+alternative-package recommendations.
 
 The option-style interface is intentionally incompatible with older published
 releases that use positional commands such as `depvex check .`. CI must install
