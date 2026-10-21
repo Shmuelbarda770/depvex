@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import os
 import re
 import sys
@@ -18,9 +19,80 @@ from packaging.version import Version
 IMPORT_MAPPING_FILE = Path(__file__).resolve().parent / "import_mapping_filtered.txt"
 POPULARITY_MAPPING_FILE = Path(__file__).resolve().parent / "duplicate_imports_pop.txt"
 
-from depvex.parser import DynamicImportFinding, ImportExtractor
+from depvex.parser import DynamicImportFinding, ImportExtractor, ImportRecord, ParseResult
 from depvex.utils.read_config import project_config
 from depvex.utils.read_yaml_config import read_yaml_config
+
+_log = logging.getLogger("depvex")
+
+_PEP503_SEPARATORS = re.compile(r"[-_.]+")
+_REQUIREMENT_NAME = re.compile(r"^\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)")
+_PASS_THROUGH_PREFIXES = ("-", "git+", "hg+", "svn+", "bzr+", "http://", "https://", "file:", "./", "../", "/")
+
+# Import roots that are shared by many independently published distributions.
+# ``google.cloud.storage`` and ``google.auth`` live in different packages, so the
+# first path segment alone cannot identify the dependency.
+ALWAYS_NAMESPACE_ROOTS = frozenset(
+    {"google", "azure", "opentelemetry", "zope", "sphinxcontrib", "backports", "jaraco", "ruamel", "nvidia", "awslabs"}
+)
+
+# Minimum number of dotted segments that make up a distribution name by convention.
+# ``google.cloud.storage`` -> ``google-cloud-storage`` needs three; two would match
+# the ``google-cloud`` meta package.
+_NAMESPACE_MIN_PARTS = {"google": 3}
+
+# Distributions that only aggregate other packages and are never the right answer
+# for a specific import.
+_NAMESPACE_META_PACKAGES = frozenset(
+    {"google-cloud", "azure-storage", "azure-mgmt", "azure-ai", "azure-cognitiveservices", "azure-communication"}
+)
+
+# Imports whose distribution name does not follow the ``a.b.c`` -> ``a-b-c`` convention.
+NAMESPACE_OVERRIDES: dict[str, str] = {
+    "google.protobuf": "protobuf",
+    "google.auth": "google-auth",
+    "google.oauth2": "google-auth",
+    "google.api_core": "google-api-core",
+    "google.api": "googleapis-common-protos",
+    "google.rpc": "googleapis-common-protos",
+    "google.type": "googleapis-common-protos",
+    "google.longrunning": "googleapis-common-protos",
+    "google.genai": "google-genai",
+    "google.generativeai": "google-generativeai",
+    "google.adk": "google-adk",
+    "google.appengine": "appengine-python-standard",
+    "opentelemetry.trace": "opentelemetry-api",
+    "opentelemetry.metrics": "opentelemetry-api",
+    "opentelemetry.context": "opentelemetry-api",
+    "opentelemetry.baggage": "opentelemetry-api",
+    "opentelemetry.propagate": "opentelemetry-api",
+    "opentelemetry.propagators": "opentelemetry-api",
+    "opentelemetry.semconv": "opentelemetry-semantic-conventions",
+}
+
+
+def canonical_package_name(name: str) -> str:
+    """Normalize a distribution name the way pip does (PEP 503)."""
+    return _PEP503_SEPARATORS.sub("-", name.strip()).lower()
+
+
+def is_pass_through_line(line: str) -> bool:
+    """True for requirements-file lines that are not plain ``name[specifier]`` entries.
+
+    Options (``-r``, ``-c``, ``-e``, ``--index-url``) and direct VCS/URL/path
+    requirements are owned by the user: depvex keeps them and never reports
+    them as stale.
+    """
+    stripped = line.strip()
+    return stripped.startswith(_PASS_THROUGH_PREFIXES)
+
+
+def requirement_name(entry: str) -> str:
+    """Return the PEP 503 distribution name of a requirements line, or ``""`` when it has none."""
+    if not entry or is_pass_through_line(entry) or entry.strip().startswith("#"):
+        return ""
+    match = _REQUIREMENT_NAME.match(entry)
+    return canonical_package_name(match.group(1)) if match else ""
 
 
 @dataclass(frozen=True)
@@ -43,6 +115,14 @@ class DynamicImportWarning:
     file_path: str
     loader: str
     line_number: int
+
+
+@dataclass(frozen=True)
+class ParseWarning:
+    """A source file Python's parser rejected; its imports were recovered line by line."""
+
+    file_path: str
+    error: str
 
 
 def _resolve_file_path(filename: str, configured_var_name: str | None = None) -> Path:
@@ -104,7 +184,13 @@ class DependencyResolver:
             if isinstance(module_name, str) and self._normalize_module_name(module_name)
         }
         self.NOTEBOOKS_TARGET: str = getattr(yaml_config, "notebooks_target", "requirements-notebooks.txt")
+        optional_mode = str(getattr(yaml_config, "optional_imports", "include")).lower()
+        self.OPTIONAL_IMPORTS: str = optional_mode if optional_mode in {"include", "exclude"} else "include"
         self.dynamic_import_warnings: list[DynamicImportWarning] = []
+        self.parse_warnings: list[ParseWarning] = []
+        self.optional_imports: set[str] = set()
+        self._namespace_roots: dict[str, bool] = {}
+        self._known_packages: dict[str, str] | None = None
 
         try:
             self.top_level_distributions = packages_distributions()
@@ -114,6 +200,8 @@ class DependencyResolver:
         self.IMPORT_MAPPING = self._load_import_mapping_file()
         self.POPULARITY_MAPPING = self._load_popularity_mapping_file()
 
+        self._dir_entries: dict[Path, set[str]] = {}
+        self._self_names: set[str] = set()
         self.local_modules = self._index_local_modules(self.root)
 
     def should_merge_notebooks_into_runtime(self) -> bool:
@@ -127,44 +215,116 @@ class DependencyResolver:
     def has_notebooks(self, root: str, exclude_dirs: set[str] | None = None) -> bool:
         return any(True for _ in self._walk_notebook_files(root, exclude_dirs=exclude_dirs))
 
+    _SKIP_DIRS = frozenset(
+        {".git", "__pycache__", ".venv", "venv", "env", "node_modules", "build", "dist", "site-packages"}
+    )
+    _SOURCE_ROOT_DIRS = ("src", "lib", "python")
+
     def _index_local_modules(self, root_dir: str) -> set[str]:
+        """Index the project's own importable modules.
 
-        local_mods = set()
+        Besides the flat set of dotted names used by :meth:`is_local_import`,
+        this records, per directory, which modules and packages a file in (or
+        below) that directory can import without installing anything. That is
+        what makes sibling modules (``scripts/run.py`` importing ``helper``)
+        and ``src/`` layouts (``src/pkg`` imported as ``pkg``) resolve as local
+        code instead of being mistaken for PyPI packages.
+        """
+        local_mods: set[str] = set()
         root_path = Path(root_dir).resolve()
+        skip_dirs = set(self._SKIP_DIRS) | self.IGNORE_DIRS
 
-        skip_dirs = {".git", "__pycache__", ".venv", "venv", "env", "node_modules", "build", "dist", "site-packages"}
-        skip_dirs.update(self.IGNORE_DIRS)
+        module_stems: dict[Path, set[str]] = {}
+        child_dirs: dict[Path, set[str]] = {}
+        python_dirs: set[Path] = set()
 
-        for path in root_path.rglob("*.py"):
+        for dirpath, dirnames, filenames in os.walk(root_path):
+            current = Path(dirpath)
             try:
-                rel_path = path.relative_to(root_path)
+                rel_dir = current.relative_to(root_path)
             except ValueError:
                 continue
 
-            if any(part in skip_dirs or part.startswith(".") for part in rel_path.parts):
-                continue
+            dirnames[:] = [
+                name
+                for name in dirnames
+                if name not in skip_dirs
+                and not name.startswith(".")
+                and not name.endswith(".egg-info")
+                and not self._is_ignored_dir("/".join((*rel_dir.parts, name)))
+            ]
 
-            parts = list(rel_path.with_suffix("").parts)
-            if not parts:
-                continue
+            stems = {
+                Path(name).stem.lower()
+                for name in filenames
+                if name.endswith(".py") and not name.startswith(".") and name != "__init__.py"
+            }
+            module_stems[current] = stems
+            child_dirs[current] = {name.lower() for name in dirnames}
 
-            if parts[-1] == "__init__":
-                parts.pop()
+            if stems or "__init__.py" in filenames:
+                python_dirs.add(current)
+                python_dirs.update(parent for parent in current.parents if root_path in (parent, *parent.parents))
 
-            if parts:
-                local_mods.add(".".join(parts).lower())
-
+            for filename in filenames:
+                if not filename.endswith(".py") or filename.startswith("."):
+                    continue
+                parts = [*rel_dir.parts, Path(filename).stem]
+                if parts[-1] == "__init__":
+                    parts.pop()
                 for i in range(1, len(parts) + 1):
                     local_mods.add(".".join(parts[:i]).lower())
 
+        self._dir_entries = {
+            directory: stems | {name for name in child_dirs[directory] if (directory / name) in python_dirs}
+            for directory, stems in module_stems.items()
+            if directory in python_dirs
+        }
+
+        local_mods.update(self._dir_entries.get(root_path, set()))
+        for source_root in self._SOURCE_ROOT_DIRS:
+            local_mods.update(self._dir_entries.get(root_path / source_root, set()))
+
         for entry in root_path.iterdir():
-            if entry.name not in skip_dirs and not entry.name.startswith("."):
+            if entry.name not in skip_dirs and not entry.name.startswith(".") and entry.is_file():
                 local_mods.add(entry.name.lower())
-                if entry.is_file() and entry.suffix == ".py":
+                if entry.suffix == ".py":
                     local_mods.add(entry.stem.lower())
 
-        print(f"[depvex][debug] indexed {len(local_mods)} local module paths/roots in project")
+        # A scan started inside a package directory still imports that package by name.
+        self._self_names = {root_path.name.lower()} if (root_path / "__init__.py").is_file() else set()
+        local_mods.update(self._self_names)
+
+        self._index_root = root_path
+        _log.debug("indexed %d local module paths/roots in project", len(local_mods))
         return local_mods
+
+    def _importable_names(self, directory: Path) -> set[str]:
+        """Names importable from *directory*: its own modules plus ``src``/``lib`` layouts below it."""
+        names = set(self._dir_entries.get(directory, ()))
+        for source_root in self._SOURCE_ROOT_DIRS:
+            names.update(self._dir_entries.get(directory / source_root, ()))
+        return names
+
+    def _is_local_to_file(self, module_name: str, file_path: str) -> bool:
+        """True when *file_path* can import *module_name* from the project itself.
+
+        Mirrors how Python and test runners resolve imports: a module is
+        visible from its own directory and from the directories above it, up to
+        the project root.
+        """
+        top_level = module_name.split(".", 1)[0].lower()
+        if not top_level or top_level in self._self_names:
+            return True
+
+        directory = Path(os.path.abspath(file_path)).parent
+        root_path = getattr(self, "_index_root", None)
+        while True:
+            if top_level in self._importable_names(directory):
+                return True
+            if directory == root_path or directory.parent == directory:
+                return False
+            directory = directory.parent
 
     def is_local_import(self, module_name: str) -> bool:
         if not module_name:
@@ -227,7 +387,13 @@ class DependencyResolver:
             return True
 
         package = self._normalize_module_name(self._module_to_package_name(module_name))
-        return module in self.IGNORE_PACKAGES or package in self.IGNORE_PACKAGES
+        top_level = module.split(".")[0]
+        return (
+            module in self.IGNORE_PACKAGES
+            or top_level in self.IGNORE_PACKAGES
+            or package in self.IGNORE_PACKAGES
+            or canonical_package_name(package) in {canonical_package_name(p) for p in self.IGNORE_PACKAGES}
+        )
 
     def internet_check(self, timeout: int = 3) -> bool:
         if requests is None:
@@ -243,7 +409,11 @@ class DependencyResolver:
         return False
 
     def is_installed(self, module_name: str) -> bool:
-        return importlib.util.find_spec(module_name) is not None
+        try:
+            return importlib.util.find_spec(module_name) is not None
+        except (ImportError, ValueError, AttributeError):
+            # find_spec imports parent packages of a dotted name and can fail on broken ones.
+            return False
 
     @lru_cache(maxsize=512)
     def get_local_version(self, module_name: str) -> str | None:
@@ -269,41 +439,39 @@ class DependencyResolver:
     def resolve(self, module_name: str, has_net: bool) -> str:
         normalized_module = self._normalize_module_name(module_name)
         if not normalized_module:
-            print(f"[depvex][debug] resolve skipped empty module for {module_name!r}")
+            _log.debug(f"resolve skipped empty module for {module_name!r}")
             return ""
 
         if self.is_local_import(module_name) or self.is_stdlib_module(module_name):
-            print(f"[depvex][debug] skipping local/stdlib module={normalized_module}")
+            _log.debug(f"skipping local/stdlib module={normalized_module}")
             return ""
 
-        print(f"[depvex][debug] resolving module={normalized_module} has_net={has_net}")
+        _log.debug(f"resolving module={normalized_module} has_net={has_net}")
         mapped = self._mapped_package_name(normalized_module)
         if mapped:
-            print(f"[depvex][debug] module={normalized_module} mapped to package={mapped}")
+            _log.debug(f"module={normalized_module} mapped to package={mapped}")
             package_name = mapped
         elif self.is_installed(normalized_module):
-            print(f"[depvex][debug] module={normalized_module} is installed; using installed module name")
+            _log.debug(f"module={normalized_module} is installed; using installed module name")
             package_name = self._module_to_package_name(normalized_module, use_mapping=False)
         else:
             package_name = self._module_to_package_name(normalized_module, use_mapping=True)
-            print(
-                f"[depvex][debug] module={normalized_module} has no mapping and is not installed; using fallback package={package_name}"
-            )
+            _log.debug(f"module={normalized_module} has no mapping and is not installed; using fallback package={package_name}")
 
         version = self.get_local_version(package_name)
         if version:
-            print(f"[depvex][debug] package={package_name} has local version={version}")
+            _log.debug(f"package={package_name} has local version={version}")
             return f"{package_name}=={version}"
 
         if has_net:
             latest_version = self.get_pypi_version(package_name)
             if latest_version:
-                print(f"[depvex][debug] package={package_name} resolved latest version={latest_version}")
+                _log.debug(f"package={package_name} resolved latest version={latest_version}")
                 return f"{package_name}=={latest_version}"
-            print(f"[depvex][debug] package={package_name} has no network version; using package name")
+            _log.debug(f"package={package_name} has no network version; using package name")
             return package_name
 
-        print(f"[depvex][debug] package={package_name} returned without version info")
+        _log.debug(f"package={package_name} returned without version info")
         return package_name
 
     def _module_to_package_name(self, module_name: str, use_mapping: bool = True) -> str:
@@ -387,12 +555,12 @@ class DependencyResolver:
     def _load_import_mapping_file(self) -> dict[str, list[str]]:
         mapping: dict[str, list[str]] = {}
         mapping_path = _resolve_import_mapping_path()
-        print(f"[depvex][debug] import mapping path={mapping_path}")
+        _log.debug(f"import mapping path={mapping_path}")
         if not mapping_path.is_file():
-            print(f"[depvex][debug] import mapping file does not exist at {mapping_path}")
+            _log.debug(f"import mapping file does not exist at {mapping_path}")
             return mapping
 
-        print(f"[depvex][debug] import mapping file exists at {mapping_path}")
+        _log.debug(f"import mapping file exists at {mapping_path}")
         try:
             with mapping_path.open("r", encoding="utf-8") as handle:
                 for line_number, line in enumerate(handle, start=1):
@@ -402,7 +570,7 @@ class DependencyResolver:
 
                     parts = line.split(":", 1)
                     if len(parts) != 2:
-                        print(f"[depvex][debug] skipping malformed mapping line {line_number}: {line!r}")
+                        _log.debug(f"skipping malformed mapping line {line_number}: {line!r}")
                         continue
 
                     module_name = self._normalize_module_name(parts[0])
@@ -410,17 +578,17 @@ class DependencyResolver:
                     if module_name and package_name:
                         mapping.setdefault(module_name, []).append(package_name)
         except (OSError, UnicodeDecodeError) as exc:
-            print(f"[depvex][debug] failed to read import mapping file: {exc}")
+            _log.debug(f"failed to read import mapping file: {exc}")
             return {}
 
-        print(f"[depvex][debug] loaded {len(mapping)} mapping entries from {mapping_path}")
+        _log.debug(f"loaded {len(mapping)} mapping entries from {mapping_path}")
         return mapping
 
     def _load_popularity_mapping_file(self) -> dict[str, str]:
         popularity_map: dict[str, str] = {}
         pop_path = _resolve_popularity_mapping_path()
         if not pop_path.is_file():
-            print(f"[depvex][debug] popularity file does not exist at {pop_path}")
+            _log.debug(f"popularity file does not exist at {pop_path}")
             return popularity_map
 
         current_module = None
@@ -462,97 +630,249 @@ class DependencyResolver:
                     popularity_map[current_module] = best_package
 
         except (OSError, UnicodeDecodeError) as exc:
-            print(f"[depvex][debug] failed to read popularity mapping file: {exc}")
+            _log.debug(f"failed to read popularity mapping file: {exc}")
             return {}
 
-        print(f"[depvex][debug] loaded {len(popularity_map)} popular choices from {pop_path}")
+        _log.debug(f"loaded {len(popularity_map)} popular choices from {pop_path}")
         return popularity_map
+
+    def _known_package_names(self) -> dict[str, str]:
+        """Every distribution name the import mapping knows, keyed by its PEP 503 form."""
+        if self._known_packages is None:
+            self._known_packages = {
+                canonical_package_name(package): package
+                for packages in self.IMPORT_MAPPING.values()
+                for package in packages
+            }
+        return self._known_packages
+
+    def _is_namespace_root(self, top_level: str) -> bool:
+        """True when many distributions share *top_level* as their import root (``google``, ``azure``...)."""
+        name = top_level.lower()
+        if name in ALWAYS_NAMESPACE_ROOTS:
+            return True
+
+        cached = self._namespace_roots.get(name)
+        if cached is not None:
+            return cached
+
+        candidates = self.IMPORT_MAPPING.get(name, [])
+        prefixes = (f"{name}-", f"{name}.", f"{name}_")
+        is_root = (
+            len(candidates) >= 3
+            and sum(candidate.startswith(prefixes) for candidate in candidates) / len(candidates) >= 0.8
+            and canonical_package_name(name) not in self._known_package_names()
+        )
+        self._namespace_roots[name] = is_root
+        return is_root
+
+    def _namespace_match(self, dotted_name: str) -> tuple[str, str] | None:
+        """Resolve a dotted import to ``(matched_import_prefix, distribution)``.
+
+        Curated overrides win; otherwise the longest prefix whose hyphen-joined
+        form is a known distribution is used (``azure.storage.blob.aio`` ->
+        ``azure-storage-blob``). Returns ``None`` when nothing is known, so the
+        caller can fall back to the top-level mapping.
+        """
+        parts = [part for part in dotted_name.split(".") if part]
+        if len(parts) < 2:
+            return None
+        lowered = [part.lower() for part in parts]
+
+        for length in range(len(parts), 0, -1):
+            override = NAMESPACE_OVERRIDES.get(".".join(lowered[:length]))
+            if override:
+                return ".".join(parts[:length]), override
+
+        known = self._known_package_names()
+        minimum = _NAMESPACE_MIN_PARTS.get(lowered[0], 2)
+        for length in range(len(parts), minimum - 1, -1):
+            canonical = canonical_package_name("-".join(lowered[:length]))
+            package = known.get(canonical)
+            if package and canonical not in _NAMESPACE_META_PACKAGES:
+                return ".".join(parts[:length]), package
+        return None
+
+    def _canonical_import_names(self, record: ImportRecord) -> list[str]:
+        """Names to resolve for one import statement.
+
+        Ordinary imports resolve by their top-level package. For namespace
+        roots the matched dotted prefix is kept so the right distribution can
+        be chosen: ``from google.cloud import storage, bigquery`` yields
+        ``google.cloud.storage`` and ``google.cloud.bigquery``.
+        """
+        if not self._is_namespace_root(record.top_level):
+            return [record.top_level]
+
+        candidates = record.candidates()
+        matched: list[str] = []
+        for candidate in candidates[:-1] or candidates:
+            match = self._namespace_match(candidate)
+            if match and match[0] not in matched:
+                matched.append(match[0])
+        if not matched:
+            match = self._namespace_match(record.module)
+            if match:
+                matched.append(match[0])
+        return matched or [record.top_level]
 
     def _mapped_package_name(self, module_name: str) -> str | None:
         normalized = self._normalize_module_name(module_name)
         if not normalized:
-            print(f"[depvex][debug] cannot map empty module name")
+            _log.debug("cannot map empty module name")
             return None
+
+        if "." in normalized:
+            match = self._namespace_match(normalized)
+            if match:
+                return self._normalize_module_name(match[1])
+            normalized = normalized.split(".", 1)[0]
 
         candidates = self.IMPORT_MAPPING.get(normalized)
         if not candidates:
-            print(f"[depvex][debug] no mapping found for module={normalized}")
+            _log.debug(f"no mapping found for module={normalized}")
             return None
 
         if len(candidates) == 1:
             result = candidates[0]
-            print(f"[depvex][debug] mapping for module={normalized} -> {result}")
+            _log.debug(f"mapping for module={normalized} -> {result}")
             return result
 
         popular_choice = self.POPULARITY_MAPPING.get(normalized)
         if popular_choice and popular_choice in candidates:
-            print(f"[depvex][debug] popularity map for module={normalized} -> {popular_choice}")
+            _log.debug(f"popularity map for module={normalized} -> {popular_choice}")
             return popular_choice
 
         for candidate in candidates:
             if candidate == normalized:
-                print(f"[depvex][debug] mapping for module={normalized} -> {candidate}")
+                _log.debug(f"mapping for module={normalized} -> {candidate}")
                 return candidate
 
         result = candidates[0]
-        print(f"[depvex][debug] mapping for module={normalized} -> {result} (first candidate)")
+        _log.debug(f"mapping for module={normalized} -> {result} (first candidate)")
         return result
 
     def _read_existing_requirements(self, path: str) -> list[str]:
+        """Plain requirement entries in *path*; comments, options and URL/VCS lines are not entries."""
         if not os.path.exists(path):
-            print(f"[depvex][debug] requirements file does not exist at {path}")
+            _log.debug("requirements file does not exist at %s", path)
             return []
 
         try:
             with open(path, "r", encoding="utf-8") as handle:
-                return [line.strip() for line in handle if line.strip() and not line.strip().startswith("#")]
+                return [
+                    line.strip()
+                    for line in handle
+                    if line.strip() and not line.strip().startswith("#") and not is_pass_through_line(line)
+                ]
         except (OSError, UnicodeDecodeError) as exc:
-            print(f"[depvex][debug] failed to read requirements file {path}: {exc}")
+            _log.debug("failed to read requirements file %s: %s", path, exc)
             return []
 
+    @staticmethod
+    def _requirements_file_layout(path: str) -> tuple[list[str], list[str], dict[str, list[str]]]:
+        """Split an existing requirements file into the parts depvex must not destroy.
+
+        Returns ``(header, options, comments)``: the leading comment block, the
+        option / URL / VCS lines (``-r base.txt``, ``--index-url ...``), and the
+        comment lines that sit directly above each requirement, keyed by name.
+        """
+        header: list[str] = []
+        options: list[str] = []
+        comments: dict[str, list[str]] = {}
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                lines = [line.rstrip("\r\n") for line in handle]
+        except (OSError, UnicodeDecodeError):
+            return header, options, comments
+
+        pending: list[str] = []
+        seen_requirement = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                if not seen_requirement:
+                    header.extend([*pending, ""])
+                pending = []
+            elif stripped.startswith("#"):
+                pending.append(stripped)
+            elif is_pass_through_line(stripped):
+                options.extend([*pending, stripped])
+                pending = []
+            else:
+                seen_requirement = True
+                name = requirement_name(stripped)
+                if name:
+                    comments[name] = pending
+                pending = []
+
+        while header and not header[-1]:
+            header.pop()
+        return header, options, comments
+
     def write_req(self, lines: Iterable[str], path: str = "requirements.txt") -> None:
+        """Write *lines* sorted, keeping the user's header, options and per-package comments."""
         directory = os.path.dirname(path)
         if directory:
             os.makedirs(directory, exist_ok=True)
 
         valid_lines = [line for line in lines if line]
+        header, options, comments = self._requirements_file_layout(path)
+
+        output: list[str] = []
+        if header:
+            output.extend([*header, ""])
+        output.extend(options)
+        for line in sorted(set(valid_lines)):
+            output.extend(comments.get(requirement_name(line), []))
+            output.append(line)
+
         try:
             with open(path, "w", encoding="utf-8") as handle:
-                for line in sorted(set(valid_lines)):
+                for line in output:
                     handle.write(line + "\n")
         except OSError as exc:
-            print(f"[depvex][debug] failed to write requirements file {path}: {exc}")
+            _log.debug("failed to write requirements file %s: %s", path, exc)
 
     def _get_imports_for_file(self, file_path: str) -> tuple[str, ...]:
-        try:
-            stat = os.stat(file_path)
-            cache_key = (file_path, stat.st_mtime_ns)
-            return self._get_imports_for_file_cached(cache_key)
-        except (OSError, SyntaxError, UnicodeDecodeError) as exc:
-            print(f"[depvex][debug] failed to inspect imports for {file_path}: {exc}")
-            return ()
+        """Top-level third-party module names imported by *file_path*."""
+        return tuple(sorted({record.top_level for record in self._parse_file(file_path).records}))
 
     def _get_dynamic_imports_for_file(self, file_path: str) -> tuple[DynamicImportFinding, ...]:
-        """Return runtime import-loader calls in *file_path*, without hiding parse errors."""
-        try:
-            with open(file_path, "r", encoding="utf-8") as handle:
-                return tuple(self.parser.extract_dynamic_imports(handle.read()))
-        except (OSError, SyntaxError, UnicodeDecodeError) as exc:
-            print(f"[depvex][debug] failed to inspect dynamic imports for {file_path}: {exc}")
-            return ()
+        """Return runtime import-loader calls in *file_path*."""
+        return tuple(self._parse_file(file_path).dynamic_findings)
 
-    @lru_cache(maxsize=512)
-    def _get_imports_for_file_cached(self, cache_key: tuple[str, int]) -> tuple[str, ...]:
+    def _parse_file(self, file_path: str) -> ParseResult:
+        """Parse one source file or notebook, cached until the file changes."""
+        try:
+            cache_key = (file_path, os.stat(file_path).st_mtime_ns)
+        except OSError as exc:
+            _log.debug("failed to inspect %s: %s", file_path, exc)
+            return ParseResult(error=str(exc))
+        return self._parse_file_cached(cache_key)
+
+    @lru_cache(maxsize=2048)
+    def _parse_file_cached(self, cache_key: tuple[str, int]) -> ParseResult:
         file_path, _ = cache_key
         try:
-            with open(file_path, "r", encoding="utf-8") as handle:
-                content = handle.read()
-                if file_path.endswith(".ipynb"):
-                    return tuple(self.parser.extract_notebook_imports(content))
-                return tuple(self.parser.extract_imports(content))
-        except (OSError, SyntaxError, UnicodeDecodeError) as exc:
-            print(f"[depvex][debug] failed to parse imports from {file_path}: {exc}")
-            return ()
+            with open(file_path, "rb") as handle:
+                raw = handle.read()
+        except OSError as exc:
+            _log.debug("failed to read %s: %s", file_path, exc)
+            return ParseResult(error=str(exc))
+
+        if file_path.endswith(".ipynb"):
+            return self.parser.parse_notebook(raw.decode("utf-8", errors="replace"))
+        return self.parser.parse_source(raw)
+
+    def _file_dependencies(self, file_path: str) -> list[tuple[str, bool]]:
+        """``(name, optional)`` pairs *file_path* needs from outside the project."""
+        dependencies: list[tuple[str, bool]] = []
+        for record in self._parse_file(file_path).records:
+            for name in self._canonical_import_names(record):
+                if not self._is_local_to_file(name, file_path):
+                    dependencies.append((name, record.optional))
+        return dependencies
 
     def _get_active_service_folders(self, root: str) -> list[str]:
         return [folder for folder in self.MICRO_SERVICE_FOLDERS if os.path.isdir(os.path.join(root, folder))]
@@ -566,17 +886,28 @@ class DependencyResolver:
         runtime_imports: set[str] = set()
         test_imports: set[str] = set()
         notebook_imports: set[str] = set()
+        required: set[str] = set()
         self.dynamic_import_warnings = []
+        self.parse_warnings = []
+
+        def collect(file_path: str, target: set[str]) -> None:
+            for name, optional in self._file_dependencies(file_path):
+                target.add(name)
+                if not optional:
+                    required.add(name)
+            parsed = self._parse_file(file_path)
+            if parsed.used_fallback:
+                self.parse_warnings.append(ParseWarning(file_path, parsed.error or "syntax error"))
 
         for file_path in self._walk_python_files(root, exclude_dirs=exclude_dirs):
-            target = test_imports if self._is_test_file(file_path, root) else runtime_imports
-            target.update(self._get_imports_for_file(file_path))
+            collect(file_path, test_imports if self._is_test_file(file_path, root) else runtime_imports)
             self._record_dynamic_import_warnings(file_path)
 
         for file_path in self._walk_notebook_files(root, exclude_dirs=exclude_dirs):
-            notebook_imports.update(self._get_imports_for_file(file_path))
+            collect(file_path, notebook_imports)
 
         runtime_imports.update(self.DYNAMIC_IMPORTS)
+        required.update(self.DYNAMIC_IMPORTS)
 
         if self.should_merge_notebooks_into_runtime():
             runtime_imports.update(notebook_imports)
@@ -585,6 +916,11 @@ class DependencyResolver:
         filtered_runtime = {module for module in runtime_imports if not self._is_ignored_package(module)}
         filtered_dev = {module for module in test_imports - filtered_runtime if not self._is_ignored_package(module)}
         filtered_notebooks = {module for module in notebook_imports if not self._is_ignored_package(module)}
+
+        # Imports that only ever appear inside ``try/except ImportError`` are optional features.
+        self.optional_imports = {module for module in filtered_runtime if module not in required}
+        if self.OPTIONAL_IMPORTS == "exclude":
+            filtered_runtime -= self.optional_imports
         return DependencyScopes(filtered_runtime, filtered_dev, filtered_notebooks)
 
     @staticmethod
@@ -606,6 +942,15 @@ class DependencyResolver:
                 self.dynamic_import_warnings.append(
                     DynamicImportWarning(file_path, finding.loader, finding.line_number)
                 )
+
+    def print_parse_warnings(self) -> None:
+        """Report files Python could not parse and whose imports were recovered heuristically."""
+        for warning in self.parse_warnings:
+            relative = os.path.relpath(warning.file_path, self.root)
+            print(
+                f"[depvex] Warning: {relative} could not be parsed ({warning.error}); "
+                "its imports were recovered line by line and may be incomplete."
+            )
 
     def print_dynamic_import_warnings(self) -> None:
         """Print actionable warnings for imports that static analysis cannot resolve."""
@@ -685,17 +1030,13 @@ class DependencyResolver:
 
         if prune_stale and os.path.exists(output_path):
             existing_entries = self._read_existing_requirements(output_path)
-            existing_by_name = {
-                self._normalize_module_name(entry): entry
-                for entry in existing_entries
-                if self._normalize_module_name(entry)
-            }
+            existing_by_name = {requirement_name(entry): entry for entry in existing_entries if requirement_name(entry)}
 
             for module_name in sorted(discovered):
                 if not module_name:
                     continue
 
-                normalized_package = self._normalize_module_name(self._module_to_package_name(module_name))
+                normalized_package = canonical_package_name(self._module_to_package_name(module_name))
                 if not normalized_package:
                     continue
 

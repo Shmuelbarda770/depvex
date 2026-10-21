@@ -180,6 +180,63 @@ def test_report_and_pyproject_flags_are_available() -> None:
     assert args.pyproject is True
 
 
+def test_compatibility_arguments_are_available() -> None:
+    args = DepvexCLI().parser.parse_args(["--compatibility", "requests>=2", "--format", "json", "."])
+
+    assert args.compatibility == "requests>=2"
+    assert args.output_format == "json"
+    assert args.paths == ["."]
+
+
+def test_compatibility_file_argument_is_available() -> None:
+    args = DepvexCLI().parser.parse_args(["--compatibility-file", "install.txt", "--no-network", "."])
+
+    assert args.compatibility_file == "install.txt"
+    assert args.no_network is True
+
+
+def test_compatibility_file_checks_each_requirement(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    requirements_file = tmp_path / "install.txt"
+    requirements_file.write_text("# packages\nrequests==2.34.2\ntextual\n-r other.txt\n", encoding="utf-8")
+    cli = DepvexCLI()
+    checked: list[str] = []
+
+    class FakeReport:
+        compatible = True
+        uncertain = False
+
+        def to_dict(self) -> dict[str, object]:
+            return {}
+
+    class FakeAnalyzer:
+        def __init__(self, root: str, allow_network: bool) -> None:
+            pass
+
+        def analyze(self, requirement: str) -> FakeReport:
+            checked.append(requirement)
+            return FakeReport()
+
+    monkeypatch.setattr("depvex.cli.CompatibilityAnalyzer", FakeAnalyzer)
+    monkeypatch.setattr(cli, "_print_compatibility_text", lambda report: None)
+
+    assert cli.compatibility_file(".", str(requirements_file), no_network=True) == 0
+    assert checked == ["requests==2.34.2", "textual"]
+
+
+def test_compatibility_command_is_dispatched(monkeypatch: pytest.MonkeyPatch) -> None:
+    cli = DepvexCLI()
+    received: list[tuple[str, str, str, bool]] = []
+
+    def fake_compatibility(path: str, package: str, output_format: str, no_network: bool) -> int:
+        received.append((path, package, output_format, no_network))
+        return 0
+
+    monkeypatch.setattr(cli, "compatibility", fake_compatibility)
+
+    assert cli.run(["--compatibility", "requests>=2", "--format", "json", "--no-network", "."]) == 0
+    assert received == [(".", "requests>=2", "json", True)]
+
+
 def test_multiple_commands_are_collected_in_cli_order() -> None:
     args = DepvexCLI().parser.parse_args(["--scan", "--check", "--report", "."])
 

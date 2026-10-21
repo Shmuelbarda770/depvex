@@ -1,12 +1,15 @@
 import argparse
+import json
+import logging
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+from depvex.compatibility import CompatibilityAnalyzer, CompatibilityReport, report_as_json
 from depvex.models.base_model import Colors
-from depvex.resolver import DependencyResolver
+from depvex.resolver import DependencyResolver, requirement_name
 from depvex.watcher import ProjectWatcher
 
 
@@ -86,6 +89,28 @@ class DepvexCLI:
             dest="command",
             help="Preview dependency changes without writing files",
         )
+        parser.add_argument(
+            "--compatibility",
+            metavar="PACKAGE",
+            help="Check whether installing a package could conflict with the project dependencies",
+        )
+        parser.add_argument(
+            "--compatibility-file",
+            metavar="FILE",
+            help="Check every package requirement in a requirements-style file",
+        )
+        parser.add_argument(
+            "--format",
+            choices=("text", "json"),
+            default="text",
+            dest="output_format",
+            help="Output format for compatibility analysis",
+        )
+        parser.add_argument(
+            "--no-network",
+            action="store_true",
+            help="Use only local metadata during compatibility analysis",
+        )
         parser.add_argument("--pyproject", action="store_true", help="Also sync or check pyproject.toml dependencies")
         parser.add_argument(
             "--ignore-dir",
@@ -94,6 +119,11 @@ class DepvexCLI:
             dest="ignore_dirs",
             metavar="DIR",
             help="Ignore a directory while scanning (repeatable; also keeps YAML ignore_dirs)",
+        )
+        parser.add_argument(
+            "--verbose",
+            action="store_true",
+            help="Show how each import was resolved (local module, mapping, installed metadata, PyPI)",
         )
         parser.add_argument("--parallel", action="store_true", help="Run selected commands concurrently")
         parser.add_argument(
@@ -118,8 +148,8 @@ class DepvexCLI:
     def _print_difference(
         self, resolver: DependencyResolver, current: list[str], expected: list[str], label: str
     ) -> None:
-        current_by_name = {resolver._normalize_module_name(entry): entry for entry in current}
-        expected_by_name = {resolver._normalize_module_name(entry): entry for entry in expected}
+        current_by_name = {requirement_name(entry) or entry: entry for entry in current}
+        expected_by_name = {requirement_name(entry) or entry: entry for entry in expected}
         missing = sorted(expected_by_name[name] for name in expected_by_name.keys() - current_by_name.keys())
         stale = sorted(current_by_name[name] for name in current_by_name.keys() - expected_by_name.keys())
         changed = sorted(
@@ -225,6 +255,7 @@ class DepvexCLI:
                 self._sync_pyproject_dev_dependencies(resolver, path, dev_entries)
 
         resolver.print_dynamic_import_warnings()
+        resolver.print_parse_warnings()
 
         nb_requirements = resolver.rebuild_notebooks(path)
         if nb_requirements is not None:
@@ -331,6 +362,7 @@ class DepvexCLI:
                     all_up_to_date = all_up_to_date and nb_up_to_date
 
         resolver.print_dynamic_import_warnings()
+        resolver.print_parse_warnings()
 
         if not all_up_to_date:
             print(
@@ -385,22 +417,93 @@ class DepvexCLI:
                     has_changes = True
 
         resolver.print_dynamic_import_warnings()
+        resolver.print_parse_warnings()
         return 1 if has_changes else 0
+
+    @staticmethod
+    def _print_compatibility_text(report: CompatibilityReport) -> None:
+        if not report.issues:
+            print(
+                Colors.colorize(
+                    f"[depvex] {report.target} appears compatible with the project requirements.", Colors.GREEN
+                )
+            )
+        else:
+            status = "CONFLICT" if not report.compatible else "REVIEW REQUIRED"
+            color = Colors.RED if not report.compatible else Colors.YELLOW
+            print(Colors.colorize(f"[depvex] {report.target}: {status}", color))
+            if report.candidate_version:
+                print(f"  candidate: {report.candidate_version}")
+            for issue in report.issues:
+                location = f" ({issue.source})" if issue.source else ""
+                requirement = f" [{issue.requirement}]" if issue.requirement else ""
+                print(f"  {issue.severity}: {issue.code}{requirement}: {issue.message}{location}")
+        if report.examined_packages:
+            print(f"  examined: {len(report.examined_packages)} package(s)")
+
+    def compatibility(self, path: str, package: str, output_format: str = "text", no_network: bool = False) -> int:
+        analyzer = CompatibilityAnalyzer(root=path, allow_network=not no_network)
+        report = analyzer.analyze(package)
+        if output_format == "json":
+            print(report_as_json(report))
+        else:
+            self._print_compatibility_text(report)
+        if not report.compatible:
+            return 1
+        return 2 if report.uncertain else 0
+
+    def compatibility_file(
+        self, path: str, requirements_file: str, output_format: str = "text", no_network: bool = False
+    ) -> int:
+        file_path = Path(requirements_file)
+        try:
+            lines = file_path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as exc:
+            print(Colors.colorize(f"[depvex] Cannot read compatibility file {file_path}: {exc}", Colors.RED))
+            return 1
+
+        requirements = [
+            line.strip()
+            for line in lines
+            if line.strip()
+            and not line.strip().startswith("#")
+            and not line.strip().startswith(("-r", "--", "-e", "git+"))
+        ]
+        if not requirements:
+            print(Colors.colorize(f"[depvex] No package requirements found in {file_path}", Colors.YELLOW))
+            return 2
+
+        analyzer = CompatibilityAnalyzer(root=path, allow_network=not no_network)
+        reports = [analyzer.analyze(requirement) for requirement in requirements]
+        if output_format == "json":
+            print(json.dumps([report.to_dict() for report in reports], indent=2, sort_keys=True))
+        else:
+            print(Colors.colorize(f"[depvex] Compatibility check for {file_path}", Colors.CYAN))
+            for report in reports:
+                self._print_compatibility_text(report)
+
+        if any(not report.compatible for report in reports):
+            return 1
+        return 2 if any(report.uncertain for report in reports) else 0
 
     def report(self, path: str, ignore_dirs: list[str] | None = None) -> int:
         resolver = DependencyResolver(root=path, ignore_dirs=ignore_dirs)
         service_folders = resolver._get_active_service_folders(path)
         groups: dict[str, list[str]] = {}
+        optional_by_group: dict[str, list[str]] = {}
 
         if service_folders:
             for service in service_folders:
                 service_root = str(Path(path) / service)
                 groups[service] = resolver.requirements_for(service_root, str(Path(service_root) / "requirements.txt"))
+                optional_by_group[service] = sorted(resolver.optional_imports)
             groups["root"] = resolver.requirements_for(
                 path, str(Path(path) / "requirements.txt"), exclude_dirs=set(service_folders)
             )
+            optional_by_group["root"] = sorted(resolver.optional_imports)
         else:
             groups["root"] = resolver.requirements_for(path, str(Path(path) / "requirements.txt"))
+            optional_by_group["root"] = sorted(resolver.optional_imports)
 
         if not resolver.should_merge_notebooks_into_runtime() and resolver.has_notebooks(path):
             nb_target = resolver.get_notebooks_target_path(path)
@@ -411,6 +514,11 @@ class DepvexCLI:
             print(f"  [{group}] {len(dependencies)} dependency entries")
             for dependency in sorted(dependencies):
                 print(f"    {dependency}")
+            optional = optional_by_group.get(group, [])
+            if optional:
+                print(f"  [{group}] optional (only imported inside try/except ImportError):")
+                for module_name in optional:
+                    print(f"    {module_name}")
 
         dependency_groups: dict[str, list[str]] = {}
         for group, dependencies in groups.items():
@@ -512,6 +620,27 @@ class DepvexCLI:
 
     def run(self, argv: list[str] | None = None) -> int:
         args = self.parser.parse_args(argv or sys.argv[1:])
+        if args.verbose:
+            handler = logging.StreamHandler(sys.stderr)
+            handler.setFormatter(logging.Formatter("[depvex][debug] %(message)s"))
+            depvex_logger = logging.getLogger("depvex")
+            depvex_logger.handlers = [handler]
+            depvex_logger.setLevel(logging.DEBUG)
+        if args.compatibility is not None or args.compatibility_file is not None:
+            if args.command is not None:
+                self.parser.error("compatibility checks cannot be combined with another command")
+            if args.compatibility is not None and args.compatibility_file is not None:
+                self.parser.error("--compatibility and --compatibility-file cannot be used together")
+            if len(args.paths) != 1:
+                self.parser.error("compatibility checks accept exactly one project path")
+            if args.compatibility_file is not None:
+                return self.compatibility_file(
+                    args.paths[0],
+                    args.compatibility_file,
+                    output_format=args.output_format,
+                    no_network=args.no_network,
+                )
+            return self.compatibility(args.paths[0], args.compatibility, output_format=args.output_format, no_network=args.no_network)
         if args.command is None:
             self.parser.error("at least one command is required")
 

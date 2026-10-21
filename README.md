@@ -26,7 +26,27 @@ as pip-tools, Poetry, or uv.
   Computed module targets, plugin loaders, and entry-point loaders produce an
   actionable warning instead of an unsafe guess.
 - Ignores modules from the Python standard library.
-- Skips imports annotated with `# ignore depvex`.
+- Never treats relative imports (`from . import x`, `from .pkg import y`) as
+  third-party packages.
+- Recognises your own code as local, the way Python does: sibling modules next
+  to the importing file, packages in `src/` (or `lib/`) layouts, and the
+  package you are scanning from. A folder that only contains data (for example
+  a `redis/` config directory) does not hide a real `redis` dependency.
+- Resolves namespace packages by their full import path instead of the first
+  segment: `from google.cloud import storage` becomes `google-cloud-storage`,
+  `import azure.storage.blob` becomes `azure-storage-blob`, and
+  `google.protobuf`, `google.auth`, `opentelemetry.sdk` and similar map to
+  their own distributions.
+- Reads source the way Python does: files with a PEP 263 encoding declaration
+  or a BOM are decoded correctly, and files that no longer parse (Python 2
+  code, a stray syntax error) still contribute their imports. Such files are
+  listed in a warning because the result may be incomplete.
+- Detects imports guarded by `try: ... except ImportError:` as optional.
+  They are listed under `--report`, and can be left out of `requirements.txt`
+  with `optional_imports: exclude` in `depvex.yaml` (default: `include`).
+- Finds modules named in `pytest_plugins` and in Django's `INSTALLED_APPS`.
+- Skips imports annotated with `# ignore depvex` (anywhere on a multi-line
+  import).
 - Skips imports inside `if TYPE_CHECKING:` and `if typing.TYPE_CHECKING:` blocks so type-only imports do not pollute production requirements.
 - Recursively scans `.py` and `.ipynb` files, excluding `.git`, `__pycache__`, `.venv`,
   `venv`, `node_modules`, and `.ipynb_checkpoints`.
@@ -45,7 +65,14 @@ as pip-tools, Poetry, or uv.
   detected, it queries PyPI; otherwise it writes the package name without a
   version.
 - Preserves an existing requirements entry when the same package is still
-  imported, and removes entries for imports that disappeared.
+  imported, and removes entries for imports that disappeared. Package names
+  are compared the way pip does (`python_dateutil` and `python-dateutil` are
+  the same package).
+- Keeps what you wrote by hand: a leading comment block, option lines such as
+  `-r base.txt` or `--index-url ...`, direct URL/VCS requirements, inline
+  comments, and comments placed directly above a requirement. Only plain
+  requirement lines are compared and rewritten, and rewriting twice gives the
+  same file.
 - Uses the same dependency calculation for `scan` and `check`.
 - Explains failed checks with missing, stale, and changed requirement entries.
 - Can explicitly sync and verify `[project].dependencies` in `pyproject.toml`.
@@ -115,6 +142,8 @@ combined with `ignore_dirs` from `depvex.yaml`.
 | `depvex --watch [path]` | Scan once, then watch the path. | Updates affected requirements files after the debounce delay. |
 | `depvex --report [path]` | Inspect dependency ownership. | Lists root/service dependencies and shared packages without writing files. |
 | `depvex --diff [path]` | Preview changes. | Prints colour-coded missing, stale, and changed dependencies without writing files; exits `1` when changes exist. |
+| `depvex --compatibility PACKAGE [path]` | Analyze a package before installing it. | Checks direct and transitive requirement conflicts without modifying the environment. |
+| `depvex --compatibility-file FILE [path]` | Analyze an entire requirements-style file. | Checks every package requirement and aggregates conflicts and uncertain results. |
 
 `-v`, `-V`, and `--version` continue to print the installed version.
 
@@ -127,6 +156,62 @@ depvex --check --pyproject .
 ```
 
 `path` defaults to the current directory.
+
+### Compatibility analysis
+
+Use `--compatibility` as a dry-run before adding a package to an existing
+environment or requirements file:
+
+```bash
+depvex --compatibility "fastapi>=0.115" .
+depvex --compatibility "fastapi>=0.115" --format json .
+depvex --compatibility "fastapi>=0.115" --no-network .
+depvex --compatibility-file requirements.txt .
+depvex --compatibility-file install.txt --format json .
+```
+
+The analyzer reads the project's requirements files, resolves package metadata
+from the local environment and, when allowed, PyPI, then examines the target's
+dependency graph. It never runs `pip install` and never modifies a file.
+
+This check answers a different question from `pip show PACKAGE`. `pip show`
+only confirms that some version is installed in the current Python environment.
+Depvex checks whether the requested version can coexist with the versions and
+constraints already declared by the project. For example, if the project has
+`requests==2.34.2`, then `requests==2.34.1` is a conflict even when
+`requests` is installed, because the requested version does not satisfy the
+project's exact pin.
+
+Depvex also follows the candidate package's dependencies. If a new package
+requires `urllib3>=2.0` while the project pins `urllib3==1.26.0`, the direct
+package may look safe but the installation would still create a transitive
+conflict. This is the main reason to run the check before changing the
+environment: it can expose conflicts that are not visible from the package
+name alone.
+
+Use `--compatibility-file FILE` when you want to review several packages before
+installing them. The file uses the usual requirements format: blank lines and
+comments are ignored, as are `-r`, `--`, `-e`, and `git+` entries. Each remaining
+requirement is checked against the project's existing requirements and its
+result is printed separately. For example:
+
+```bash
+depvex --compatibility-file install.txt .
+```
+
+By default, compatibility checks may query PyPI for versions and dependency
+metadata. Add `--no-network` to use only locally installed metadata; packages
+that cannot be resolved are reported as `REVIEW REQUIRED` rather than as a
+confirmed conflict. The file command returns `1` if any requirement conflicts,
+`2` if there are no conflicts but at least one result is uncertain, and `0` when
+all requirements are compatible.
+
+Exit codes are designed for automation: `0` means no known conflict, `1`
+means a direct or transitive conflict was found, and `2` means the result is
+uncertain because candidate or dependency metadata was unavailable. JSON output
+contains stable issue codes, severity, package, requirement, source, and the
+packages examined. A future resolver can use this same report contract to add
+alternative-package recommendations.
 
 The option-style interface is intentionally incompatible with older published
 releases that use positional commands such as `depvex check .`. CI must install
@@ -201,7 +286,8 @@ children of the scanned root.
 ### Configuration sources
 
 - `depvex.yaml` / `depvex.yml`: `ignore_dirs` and
-  `micro_servi_folders`, plus `ignore_packages` and `dynamic_imports`.
+  `micro_servi_folders`, plus `ignore_packages`, `dynamic_imports` and
+  `optional_imports` (`include` or `exclude`).
 - `config.json` / `depvex.json`: `CAPTIVE_PORTAL_URLS` for the connectivity
   check and `debounce_seconds` for watch mode.
 
@@ -264,8 +350,12 @@ reviewed source of truth.
 
 ## Limitations
 
-- Only static imports are detected; dynamic imports and dependencies loaded
-  from configuration are outside the analysis.
+- Only static imports are detected, plus literal `import_module(...)` targets,
+  `pytest_plugins` and `INSTALLED_APPS`. Dependencies loaded from other
+  configuration are outside the analysis.
+- Optional-import detection recognises `try/except ImportError` guards only. An
+  import guarded by a runtime flag (`if has_simplejson:`) is still treated as
+  required, which errs on the side of listing a dependency.
 - Import names and distribution names are not always identical. Accurate
   mapping depends on installed distribution metadata or a maintained import
   mapping fallback.
@@ -273,7 +363,11 @@ reviewed source of truth.
   updated with new mappings for best results.
 - The PyPI fallback needs network access and can reflect a newer version than
   the one you intend to pin.
-- Syntax or decoding errors in a scanned Python file are skipped.
+- A file with a syntax error is scanned line by line instead of with the full
+  parser, so unusual import formatting in such a file can be missed. depvex
+  prints a warning for every file handled this way.
+- The `--verbose` flag shows how each import was resolved. Without it depvex
+  prints only its results and warnings.
 - Watch mode currently reacts to creation and modification events, not every
   possible filesystem operation.
 

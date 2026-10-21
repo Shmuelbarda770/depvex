@@ -25,6 +25,7 @@ authors = [
 
 dependencies = [
   "requests==2.34.2",
+  "packaging>=24",
   "watchdog==6.0.0"
 ]
 
