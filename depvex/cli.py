@@ -1,4 +1,6 @@
 import argparse
+import json
+import logging
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -7,7 +9,7 @@ from pathlib import Path
 
 from depvex.compatibility import CompatibilityAnalyzer, CompatibilityReport, report_as_json
 from depvex.models.base_model import Colors
-from depvex.resolver import DependencyResolver
+from depvex.resolver import DependencyResolver, requirement_name
 from depvex.watcher import ProjectWatcher
 
 
@@ -118,6 +120,11 @@ class DepvexCLI:
             metavar="DIR",
             help="Ignore a directory while scanning (repeatable; also keeps YAML ignore_dirs)",
         )
+        parser.add_argument(
+            "--verbose",
+            action="store_true",
+            help="Show how each import was resolved (local module, mapping, installed metadata, PyPI)",
+        )
         parser.add_argument("--parallel", action="store_true", help="Run selected commands concurrently")
         parser.add_argument(
             "--jobs", type=int, default=None, help="Maximum concurrent commands (default: number of selected commands)"
@@ -141,8 +148,8 @@ class DepvexCLI:
     def _print_difference(
         self, resolver: DependencyResolver, current: list[str], expected: list[str], label: str
     ) -> None:
-        current_by_name = {resolver._normalize_module_name(entry): entry for entry in current}
-        expected_by_name = {resolver._normalize_module_name(entry): entry for entry in expected}
+        current_by_name = {requirement_name(entry) or entry: entry for entry in current}
+        expected_by_name = {requirement_name(entry) or entry: entry for entry in expected}
         missing = sorted(expected_by_name[name] for name in expected_by_name.keys() - current_by_name.keys())
         stale = sorted(current_by_name[name] for name in current_by_name.keys() - expected_by_name.keys())
         changed = sorted(
@@ -248,6 +255,7 @@ class DepvexCLI:
                 self._sync_pyproject_dev_dependencies(resolver, path, dev_entries)
 
         resolver.print_dynamic_import_warnings()
+        resolver.print_parse_warnings()
 
         nb_requirements = resolver.rebuild_notebooks(path)
         if nb_requirements is not None:
@@ -354,6 +362,7 @@ class DepvexCLI:
                     all_up_to_date = all_up_to_date and nb_up_to_date
 
         resolver.print_dynamic_import_warnings()
+        resolver.print_parse_warnings()
 
         if not all_up_to_date:
             print(
@@ -408,6 +417,7 @@ class DepvexCLI:
                     has_changes = True
 
         resolver.print_dynamic_import_warnings()
+        resolver.print_parse_warnings()
         return 1 if has_changes else 0
 
     @staticmethod
@@ -480,16 +490,20 @@ class DepvexCLI:
         resolver = DependencyResolver(root=path, ignore_dirs=ignore_dirs)
         service_folders = resolver._get_active_service_folders(path)
         groups: dict[str, list[str]] = {}
+        optional_by_group: dict[str, list[str]] = {}
 
         if service_folders:
             for service in service_folders:
                 service_root = str(Path(path) / service)
                 groups[service] = resolver.requirements_for(service_root, str(Path(service_root) / "requirements.txt"))
+                optional_by_group[service] = sorted(resolver.optional_imports)
             groups["root"] = resolver.requirements_for(
                 path, str(Path(path) / "requirements.txt"), exclude_dirs=set(service_folders)
             )
+            optional_by_group["root"] = sorted(resolver.optional_imports)
         else:
             groups["root"] = resolver.requirements_for(path, str(Path(path) / "requirements.txt"))
+            optional_by_group["root"] = sorted(resolver.optional_imports)
 
         if not resolver.should_merge_notebooks_into_runtime() and resolver.has_notebooks(path):
             nb_target = resolver.get_notebooks_target_path(path)
@@ -500,6 +514,11 @@ class DepvexCLI:
             print(f"  [{group}] {len(dependencies)} dependency entries")
             for dependency in sorted(dependencies):
                 print(f"    {dependency}")
+            optional = optional_by_group.get(group, [])
+            if optional:
+                print(f"  [{group}] optional (only imported inside try/except ImportError):")
+                for module_name in optional:
+                    print(f"    {module_name}")
 
         dependency_groups: dict[str, list[str]] = {}
         for group, dependencies in groups.items():
@@ -601,6 +620,12 @@ class DepvexCLI:
 
     def run(self, argv: list[str] | None = None) -> int:
         args = self.parser.parse_args(argv or sys.argv[1:])
+        if args.verbose:
+            handler = logging.StreamHandler(sys.stderr)
+            handler.setFormatter(logging.Formatter("[depvex][debug] %(message)s"))
+            depvex_logger = logging.getLogger("depvex")
+            depvex_logger.handlers = [handler]
+            depvex_logger.setLevel(logging.DEBUG)
         if args.compatibility is not None or args.compatibility_file is not None:
             if args.command is not None:
                 self.parser.error("compatibility checks cannot be combined with another command")
